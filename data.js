@@ -4,6 +4,12 @@ const STAGES = [
     name: 'Prep Strat',
     icon: '🎯',
     color: '#6366f1',
+    steps: [
+      { id: 'stp-ps-1', title: 'Research company background and recent news' },
+      { id: 'stp-ps-2', title: 'Identify key stakeholders and org chart' },
+      { id: 'stp-ps-3', title: 'Review competitive landscape' },
+      { id: 'stp-ps-4', title: 'Define success criteria and ICP fit' },
+    ],
     conditions: [
       {
         id: 'ps-new-logo',
@@ -32,6 +38,12 @@ const STAGES = [
     name: 'Discovery',
     icon: '🔍',
     color: '#0ea5e9',
+    steps: [
+      { id: 'stp-d-1', title: 'Send pre-call agenda to prospect' },
+      { id: 'stp-d-2', title: 'Confirm attendees and roles' },
+      { id: 'stp-d-3', title: 'Prepare discovery question set' },
+      { id: 'stp-d-4', title: 'Send follow-up summary within 24 hrs' },
+    ],
     conditions: [
       {
         id: 'disc-active',
@@ -59,6 +71,12 @@ const STAGES = [
     name: 'Demo',
     icon: '🖥️',
     color: '#8b5cf6',
+    steps: [
+      { id: 'stp-dm-1', title: 'Customize demo environment to prospect use case' },
+      { id: 'stp-dm-2', title: 'Confirm attendees and send agenda' },
+      { id: 'stp-dm-3', title: 'Prep answers to likely technical questions' },
+      { id: 'stp-dm-4', title: 'Send post-demo recap and next steps' },
+    ],
     conditions: [
       {
         id: 'demo-active',
@@ -96,6 +114,12 @@ const STAGES = [
     name: 'Decision',
     icon: '⚖️',
     color: '#f59e0b',
+    steps: [
+      { id: 'stp-dec-1', title: 'Confirm decision criteria and weighting' },
+      { id: 'stp-dec-2', title: 'Deliver tailored business case' },
+      { id: 'stp-dec-3', title: 'Schedule executive alignment call' },
+      { id: 'stp-dec-4', title: 'Confirm decision timeline and next step' },
+    ],
     conditions: [
       {
         id: 'dec-active',
@@ -132,6 +156,11 @@ const STAGES = [
     name: 'Verbal Yes',
     icon: '🤝',
     color: '#10b981',
+    steps: [
+      { id: 'stp-vy-1', title: 'Send verbal confirmation email to champion' },
+      { id: 'stp-vy-2', title: 'Build and share mutual close plan' },
+      { id: 'stp-vy-3', title: 'Confirm internal approvals needed' },
+    ],
     conditions: [
       {
         id: 'vy-active',
@@ -159,6 +188,12 @@ const STAGES = [
     name: 'Procurement / Legal',
     icon: '📋',
     color: '#06b6d4',
+    steps: [
+      { id: 'stp-pr-1', title: 'Send order form / MSA to procurement' },
+      { id: 'stp-pr-2', title: 'Confirm legal reviewer and point of contact' },
+      { id: 'stp-pr-3', title: 'Schedule redline review call' },
+      { id: 'stp-pr-4', title: 'Confirm signature authority and process' },
+    ],
     conditions: [
       {
         id: 'proc-standard',
@@ -195,6 +230,11 @@ const STAGES = [
     name: 'No Show',
     icon: '📵',
     color: '#ef4444',
+    steps: [
+      { id: 'stp-ns-1', title: 'Send reschedule message within 15 minutes' },
+      { id: 'stp-ns-2', title: 'Follow up again at 24 hours' },
+      { id: 'stp-ns-3', title: 'Re-qualify deal status in CRM' },
+    ],
     conditions: [
       {
         id: 'ns-first',
@@ -221,6 +261,12 @@ const STAGES = [
     name: 'Closed',
     icon: '🏁',
     color: '#64748b',
+    steps: [
+      { id: 'stp-cl-1', title: 'Update CRM and close opportunity' },
+      { id: 'stp-cl-2', title: 'Brief CS team and schedule kickoff' },
+      { id: 'stp-cl-3', title: 'Send internal win / loss notification' },
+      { id: 'stp-cl-4', title: 'Document key learnings in deal notes' },
+    ],
     conditions: [
       {
         id: 'closed-won',

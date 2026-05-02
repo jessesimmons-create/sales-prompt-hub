@@ -34,12 +34,27 @@
       <div id="condition-tabs"></div>
     </div>
     <div id="prompts-area">
+      <!-- Prompts view -->
       <div id="condition-banner"></div>
       <div id="prompts-grid"></div>
+
+      <!-- Steps view -->
+      <div id="steps-view" class="hidden">
+        <div id="steps-progress-section">
+          <div id="steps-progress-header">
+            <span id="steps-count-label"></span>
+            <span id="steps-pct-label"></span>
+          </div>
+          <div id="steps-progress-track">
+            <div id="steps-progress-fill"></div>
+          </div>
+        </div>
+        <div id="steps-grid"></div>
+      </div>
     </div>
   </div>
 
-  <!-- Add Prompt Modal -->
+  <!-- Add Modal (shared for prompts + steps) -->
   <div id="modal-overlay" class="hidden" role="dialog" aria-modal="true">
     <div id="modal">
       <div id="modal-header">
@@ -49,7 +64,10 @@
       <div id="modal-body">
         <label for="modal-input-title">Title <span class="required">*</span></label>
         <input id="modal-input-title" type="text" placeholder="e.g. ICP Fit Analysis" autocomplete="off" />
-        <label for="modal-input-body">Prompt Text <span class="optional">(optional — add now or later)</span></label>
+        <label for="modal-input-body">
+          <span id="modal-body-label">Prompt Text</span>
+          <span class="optional">(optional — add now or later)</span>
+        </label>
         <textarea id="modal-input-body" rows="7" placeholder="Paste your LLM prompt here…"></textarea>
       </div>
       <div id="modal-footer">
@@ -63,7 +81,7 @@
   <div id="delete-overlay" class="hidden" role="dialog" aria-modal="true">
     <div id="delete-modal">
       <div id="delete-icon">🗑️</div>
-      <h3 id="delete-title">Remove prompt?</h3>
+      <h3 id="delete-title">Remove?</h3>
       <p id="delete-desc"></p>
       <div id="delete-footer">
         <button id="delete-cancel" class="btn-secondary">Cancel</button>
