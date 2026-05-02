@@ -39,6 +39,39 @@
     </div>
   </div>
 
+  <!-- Add Prompt Modal -->
+  <div id="modal-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div id="modal">
+      <div id="modal-header">
+        <h2 id="modal-title">Add Prompt</h2>
+        <button id="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="modal-body">
+        <label for="modal-input-title">Title <span class="required">*</span></label>
+        <input id="modal-input-title" type="text" placeholder="e.g. ICP Fit Analysis" autocomplete="off" />
+        <label for="modal-input-body">Prompt Text <span class="optional">(optional — add now or later)</span></label>
+        <textarea id="modal-input-body" rows="7" placeholder="Paste your LLM prompt here…"></textarea>
+      </div>
+      <div id="modal-footer">
+        <button id="modal-cancel" class="btn-secondary">Cancel</button>
+        <button id="modal-save" class="btn-primary">Add Prompt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div id="delete-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div id="delete-modal">
+      <div id="delete-icon">🗑️</div>
+      <h3 id="delete-title">Remove prompt?</h3>
+      <p id="delete-desc"></p>
+      <div id="delete-footer">
+        <button id="delete-cancel" class="btn-secondary">Cancel</button>
+        <button id="delete-confirm" class="btn-danger">Remove</button>
+      </div>
+    </div>
+  </div>
+
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>

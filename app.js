@@ -1,40 +1,55 @@
-const STORAGE_KEY = 'sph_used_v1';
+const STORAGE_USED    = 'sph_used_v1';
+const STORAGE_ADDED   = 'sph_added_v1';
+const STORAGE_REMOVED = 'sph_removed_v1';
+
+// ── State ─────────────────────────────────────────────
 
 const state = {
-  used: new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')),
+  used:    new Set(JSON.parse(localStorage.getItem(STORAGE_USED)    || '[]')),
+  added:       JSON.parse(localStorage.getItem(STORAGE_ADDED)   || '[]'),
+  removed: new Set(JSON.parse(localStorage.getItem(STORAGE_REMOVED) || '[]')),
   activeStageId: STAGES[0].id,
-  activeCondId: STAGES[0].conditions[0].id,
+  activeCondId:  STAGES[0].conditions[0].id,
 };
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...state.used]));
+  localStorage.setItem(STORAGE_USED,    JSON.stringify([...state.used]));
+  localStorage.setItem(STORAGE_ADDED,   JSON.stringify(state.added));
+  localStorage.setItem(STORAGE_REMOVED, JSON.stringify([...state.removed]));
+}
+
+// Returns the effective prompt list for a condition (defaults minus removed, plus custom)
+function effectivePrompts(cond) {
+  const base   = cond.prompts.filter(p => !state.removed.has(p.id));
+  const custom = state.added.filter(p => p.condId === cond.id);
+  return [...base, ...custom];
 }
 
 function stageStats(stage) {
-  const total = stage.conditions.reduce((n, c) => n + c.prompts.length, 0);
-  const used = stage.conditions.reduce((n, c) => n + c.prompts.filter(p => state.used.has(p.id)).length, 0);
-  return { total, used };
+  const prompts = stage.conditions.flatMap(c => effectivePrompts(c));
+  return {
+    total: prompts.length,
+    used:  prompts.filter(p => state.used.has(p.id)).length,
+  };
 }
 
 function condStats(cond) {
-  const total = cond.prompts.length;
-  const used = cond.prompts.filter(p => state.used.has(p.id)).length;
-  return { total, used };
+  const prompts = effectivePrompts(cond);
+  return {
+    total: prompts.length,
+    used:  prompts.filter(p => state.used.has(p.id)).length,
+  };
 }
 
-// ── Sidebar ───────────────────────────────────────────
+// ── Render ────────────────────────────────────────────
 
 function renderSidebar() {
-  const list = document.getElementById('stage-list');
-  list.innerHTML = STAGES.map(s => {
+  document.getElementById('stage-list').innerHTML = STAGES.map(s => {
     const { total, used } = stageStats(s);
     const pct = total ? (used / total) * 100 : 0;
-    const isActive = s.id === state.activeStageId;
-    const hasUsed = used > 0;
     return `
-      <div class="stage-item ${isActive ? 'active' : ''} ${hasUsed ? 'has-used' : ''}"
-           style="--stage-color: ${s.color}"
-           data-stage="${s.id}">
+      <div class="stage-item ${s.id === state.activeStageId ? 'active' : ''} ${used > 0 ? 'has-used' : ''}"
+           style="--stage-color:${s.color}" data-stage="${s.id}">
         <div class="stage-item-row">
           <span class="stage-icon">${s.icon}</span>
           <span class="stage-name">${s.name}</span>
@@ -47,65 +62,76 @@ function renderSidebar() {
   }).join('');
 }
 
-// ── Stage header ──────────────────────────────────────
-
 function renderHeader(stage) {
   const { total, used } = stageStats(stage);
-  document.getElementById('stage-header-icon').textContent = stage.icon;
+  document.getElementById('stage-header-icon').textContent  = stage.icon;
   document.getElementById('stage-header-title').textContent = stage.name;
   document.getElementById('stage-stats').textContent = `${used} of ${total} prompts used`;
-  document.getElementById('reset-stage-btn').dataset.stage = stage.id;
+  document.getElementById('reset-stage-btn').dataset.stage  = stage.id;
 }
 
-// ── Condition tabs ────────────────────────────────────
-
 function renderTabs(stage) {
-  const tabs = document.getElementById('condition-tabs');
-  tabs.innerHTML = stage.conditions.map(c => {
+  document.getElementById('condition-tabs').innerHTML = stage.conditions.map(c => {
     const { total, used } = condStats(c);
-    const allDone = used === total && total > 0;
-    const isActive = c.id === state.activeCondId;
+    const allDone = total > 0 && used === total;
     return `
-      <div class="cond-tab ${isActive ? 'active' : ''} ${allDone ? 'all-done' : ''}"
-           style="--active-color: ${stage.color}"
-           data-cond="${c.id}">
+      <div class="cond-tab ${c.id === state.activeCondId ? 'active' : ''} ${allDone ? 'all-done' : ''}"
+           style="--active-color:${stage.color}" data-cond="${c.id}">
         ${c.name}
         <span class="cond-tab-count">${used}/${total}</span>
       </div>`;
   }).join('');
 }
 
-// ── Prompts ───────────────────────────────────────────
-
 function renderPrompts(stage) {
   const cond = stage.conditions.find(c => c.id === state.activeCondId);
   if (!cond) return;
 
-  document.getElementById('condition-banner').textContent = cond.description;
-  document.getElementById('condition-banner').style.setProperty('--banner-color', stage.color);
+  const banner = document.getElementById('condition-banner');
+  banner.textContent = cond.description;
+  banner.style.setProperty('--banner-color', stage.color);
 
-  const grid = document.getElementById('prompts-grid');
-  grid.innerHTML = cond.prompts.map(p => {
+  const prompts = effectivePrompts(cond);
+
+  const cards = prompts.map(p => {
     const used = state.used.has(p.id);
-    const bodyText = p.body || 'No prompt added yet — click to add one here.';
+    const bodyText  = p.body || 'No prompt added yet — click to add one here.';
     const bodyClass = p.body ? 'has-content' : '';
     return `
       <div class="prompt-card ${used ? 'used' : ''}" data-prompt="${p.id}">
         <div class="prompt-card-top">
           <div class="prompt-check">
             <svg class="check-icon" viewBox="0 0 11 11" fill="none">
-              <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <span class="prompt-title">${p.title}</span>
+          <span class="prompt-title">${escHtml(p.title)}</span>
         </div>
-        <div class="prompt-body ${bodyClass}">${bodyText}</div>
+        <div class="prompt-body ${bodyClass}">${escHtml(bodyText)}</div>
         <span class="used-pill">✓ Used</span>
+        <button class="prompt-delete-btn" data-delete="${p.id}" title="Remove prompt"
+                aria-label="Remove prompt">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>`;
   }).join('');
-}
 
-// ── Full render ───────────────────────────────────────
+  const addBtn = `
+    <button class="add-prompt-btn" data-add-cond="${cond.id}"
+            style="--add-color:${stage.color}">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </svg>
+      Add Prompt
+    </button>`;
+
+  document.getElementById('prompts-grid').innerHTML = cards + addBtn;
+}
 
 function render() {
   const stage = STAGES.find(s => s.id === state.activeStageId);
@@ -115,6 +141,85 @@ function render() {
   renderPrompts(stage);
 }
 
+// ── Modals ────────────────────────────────────────────
+
+let pendingCondId   = null;
+let pendingDeleteId = null;
+
+function openAddModal(condId) {
+  const stage = STAGES.find(s => s.conditions.some(c => c.id === condId));
+  pendingCondId = condId;
+
+  document.getElementById('modal-input-title').value = '';
+  document.getElementById('modal-input-body').value  = '';
+  document.getElementById('modal-input-title').classList.remove('error');
+  document.querySelector('.modal-error-msg')?.classList.remove('visible');
+  document.getElementById('modal-save').style.setProperty('--modal-accent', stage?.color || '#6366f1');
+  document.getElementById('modal-input-title').style.setProperty('--modal-accent', stage?.color || '#6366f1');
+  document.getElementById('modal-input-body').style.setProperty('--modal-accent', stage?.color || '#6366f1');
+
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  document.getElementById('modal-input-title').focus();
+}
+
+function closeAddModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  pendingCondId = null;
+}
+
+function savePrompt() {
+  const title = document.getElementById('modal-input-title').value.trim();
+  const errorMsg = document.querySelector('.modal-error-msg');
+
+  if (!title) {
+    document.getElementById('modal-input-title').classList.add('error');
+    if (errorMsg) errorMsg.classList.add('visible');
+    document.getElementById('modal-input-title').focus();
+    return;
+  }
+
+  const body = document.getElementById('modal-input-body').value.trim();
+  const id   = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+
+  state.added.push({ id, condId: pendingCondId, title, body });
+  save();
+  closeAddModal();
+  render();
+}
+
+function openDeleteModal(promptId) {
+  pendingDeleteId = promptId;
+
+  // Find the prompt title across all stages
+  let title = promptId;
+  for (const stage of STAGES) {
+    for (const cond of stage.conditions) {
+      const p = effectivePrompts(cond).find(p => p.id === promptId);
+      if (p) { title = p.title; break; }
+    }
+  }
+
+  document.getElementById('delete-desc').textContent =
+    `"${title}" will be permanently removed from this condition.`;
+  document.getElementById('delete-overlay').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-overlay').classList.add('hidden');
+  pendingDeleteId = null;
+}
+
+function confirmDelete() {
+  if (!pendingDeleteId) return;
+  state.removed.add(pendingDeleteId);
+  state.used.delete(pendingDeleteId);
+  // Also remove from added if it was a custom prompt
+  state.added = state.added.filter(p => p.id !== pendingDeleteId);
+  save();
+  closeDeleteModal();
+  render();
+}
+
 // ── Event delegation ──────────────────────────────────
 
 document.getElementById('stage-list').addEventListener('click', e => {
@@ -122,7 +227,7 @@ document.getElementById('stage-list').addEventListener('click', e => {
   if (!item) return;
   const stage = STAGES.find(s => s.id === item.dataset.stage);
   state.activeStageId = stage.id;
-  state.activeCondId = stage.conditions[0].id;
+  state.activeCondId  = stage.conditions[0].id;
   render();
 });
 
@@ -134,6 +239,22 @@ document.getElementById('condition-tabs').addEventListener('click', e => {
 });
 
 document.getElementById('prompts-grid').addEventListener('click', e => {
+  // Delete button takes priority
+  const delBtn = e.target.closest('[data-delete]');
+  if (delBtn) {
+    e.stopPropagation();
+    openDeleteModal(delBtn.dataset.delete);
+    return;
+  }
+
+  // Add prompt button
+  const addBtn = e.target.closest('[data-add-cond]');
+  if (addBtn) {
+    openAddModal(addBtn.dataset.addCond);
+    return;
+  }
+
+  // Toggle used on card
   const card = e.target.closest('.prompt-card');
   if (!card) return;
   const id = card.dataset.prompt;
@@ -145,7 +266,7 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
 
 document.getElementById('reset-stage-btn').addEventListener('click', () => {
   const stage = STAGES.find(s => s.id === state.activeStageId);
-  stage.conditions.forEach(c => c.prompts.forEach(p => state.used.delete(p.id)));
+  stage.conditions.forEach(c => effectivePrompts(c).forEach(p => state.used.delete(p.id)));
   save();
   render();
 });
@@ -156,6 +277,52 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
   save();
   render();
 });
+
+// Add modal controls
+document.getElementById('modal-close').addEventListener('click', closeAddModal);
+document.getElementById('modal-cancel').addEventListener('click', closeAddModal);
+document.getElementById('modal-save').addEventListener('click', savePrompt);
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeAddModal();
+});
+
+// Add error message element after title input
+const errorEl = document.createElement('span');
+errorEl.className = 'modal-error-msg';
+errorEl.textContent = 'Please enter a prompt title.';
+document.getElementById('modal-input-title').insertAdjacentElement('afterend', errorEl);
+
+// Clear error on type
+document.getElementById('modal-input-title').addEventListener('input', () => {
+  document.getElementById('modal-input-title').classList.remove('error');
+  document.querySelector('.modal-error-msg')?.classList.remove('visible');
+});
+
+// Save on Enter in title field
+document.getElementById('modal-input-title').addEventListener('keydown', e => {
+  if (e.key === 'Enter') savePrompt();
+});
+
+// Delete modal controls
+document.getElementById('delete-cancel').addEventListener('click', closeDeleteModal);
+document.getElementById('delete-confirm').addEventListener('click', confirmDelete);
+document.getElementById('delete-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('delete-overlay')) closeDeleteModal();
+});
+
+// ESC closes whichever modal is open
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('modal-overlay').classList.contains('hidden'))  closeAddModal();
+  if (!document.getElementById('delete-overlay').classList.contains('hidden')) closeDeleteModal();
+});
+
+// ── Helpers ───────────────────────────────────────────
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 // ── Init ──────────────────────────────────────────────
 
