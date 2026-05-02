@@ -46,7 +46,6 @@ function condStats(cond) {
 function renderSidebar() {
   document.getElementById('stage-list').innerHTML = STAGES.map(s => {
     const { total, used } = stageStats(s);
-    const pct = total ? (used / total) * 100 : 0;
     return `
       <div class="stage-item ${s.id === state.activeStageId ? 'active' : ''} ${used > 0 ? 'has-used' : ''}"
            style="--stage-color:${s.color}" data-stage="${s.id}">
@@ -54,9 +53,12 @@ function renderSidebar() {
           <span class="stage-icon">${s.icon}</span>
           <span class="stage-name">${s.name}</span>
           <span class="stage-badge">${used}/${total}</span>
-        </div>
-        <div class="stage-progress-track">
-          <div class="stage-progress-fill" style="width:${pct}%"></div>
+          <span class="stage-check">
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+              <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
         </div>
       </div>`;
   }).join('');

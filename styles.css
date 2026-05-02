@@ -106,21 +106,19 @@ body {
   flex-shrink: 0;
 }
 
-.stage-item.has-used .stage-badge { color: var(--stage-color); }
-
-.stage-progress-track {
-  height: 2px;
-  background: rgba(255,255,255,0.07);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.stage-progress-fill {
-  height: 100%;
+.stage-check {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   background: var(--stage-color);
-  border-radius: 2px;
-  transition: width 0.3s ease;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
+
+.stage-item.has-used .stage-check { display: flex; }
+.stage-item.has-used .stage-badge { display: none; }
 
 #sidebar-footer {
   padding: 14px 18px;
