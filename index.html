@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Prompt Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <div class="app-label">Deal Stages</div>
+      <h1>Sales Prompt Hub</h1>
+    </div>
+    <div id="stage-list"></div>
+    <div id="sidebar-footer">
+      <button id="reset-all-btn">Reset All Progress</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="stage-header">
+      <div id="stage-header-top">
+        <span id="stage-header-icon"></span>
+        <span id="stage-header-title"></span>
+        <div id="stage-header-meta">
+          <span id="stage-stats"></span>
+          <button id="reset-stage-btn">Reset Stage</button>
+        </div>
+      </div>
+      <div id="condition-tabs"></div>
+    </div>
+    <div id="prompts-area">
+      <div id="condition-banner"></div>
+      <div id="prompts-grid"></div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
