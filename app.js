@@ -202,8 +202,10 @@ function renderOppSelector() {
 function renderSidebar() {
   document.getElementById('stage-list').innerHTML = STAGES.map(s => {
     const { total, used } = stageStats(s);
+    const { total: sTotal, used: sUsed } = stepStats(s);
+    const stepsComplete = sTotal > 0 && sUsed === sTotal;
     return `
-      <div class="stage-item ${s.id === state.activeStageId ? 'active' : ''} ${used > 0 ? 'has-used' : ''}"
+      <div class="stage-item ${s.id === state.activeStageId ? 'active' : ''} ${stepsComplete ? 'has-used' : ''}"
            style="--stage-color:${s.color}" data-stage="${s.id}">
         <div class="stage-item-row">
           <span class="stage-icon">${s.icon}</span>
