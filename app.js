@@ -1,37 +1,128 @@
-// ── Storage keys ──────────────────────────────────────
+// ── Storage ───────────────────────────────────────────
 
 const SK = {
-  used:         'sph_used_v1',
-  added:        'sph_added_v1',
-  removed:      'sph_removed_v1',
-  stepsUsed:    'sph_steps_used_v1',
-  stepsAdded:   'sph_steps_added_v1',
-  stepsRemoved: 'sph_steps_removed_v1',
+  opps:      'sph_opps',
+  activeOpp: 'sph_active_opp',
+  opp: id => ({
+    used:         `sph_${id}_used`,
+    added:        `sph_${id}_added`,
+    removed:      `sph_${id}_removed`,
+    stepsUsed:    `sph_${id}_steps_used`,
+    stepsAdded:   `sph_${id}_steps_added`,
+    stepsRemoved: `sph_${id}_steps_removed`,
+  }),
 };
 
-// ── State ─────────────────────────────────────────────
+// Migrate data from the previous single-opportunity format
+(function migrate() {
+  if (localStorage.getItem(SK.opps)) return;
+  const id = 'opp_default';
+  const keyMap = {
+    'sph_used_v1':         SK.opp(id).used,
+    'sph_added_v1':        SK.opp(id).added,
+    'sph_removed_v1':      SK.opp(id).removed,
+    'sph_steps_used_v1':   SK.opp(id).stepsUsed,
+    'sph_steps_added_v1':  SK.opp(id).stepsAdded,
+    'sph_steps_removed_v1':SK.opp(id).stepsRemoved,
+  };
+  Object.entries(keyMap).forEach(([oldKey, newKey]) => {
+    const v = localStorage.getItem(oldKey);
+    if (v) { localStorage.setItem(newKey, v); localStorage.removeItem(oldKey); }
+  });
+  const opp = { id, name: 'Default', createdAt: Date.now() };
+  localStorage.setItem(SK.opps, JSON.stringify([opp]));
+  localStorage.setItem(SK.activeOpp, id);
+})();
+
+// ── Opportunity helpers ───────────────────────────────
+
+function loadOppState(id) {
+  const k = SK.opp(id);
+  return {
+    used:         new Set(JSON.parse(localStorage.getItem(k.used)         || '[]')),
+    added:             JSON.parse(localStorage.getItem(k.added)        || '[]'),
+    removed:      new Set(JSON.parse(localStorage.getItem(k.removed)      || '[]')),
+    stepsUsed:    new Set(JSON.parse(localStorage.getItem(k.stepsUsed)    || '[]')),
+    stepsAdded:        JSON.parse(localStorage.getItem(k.stepsAdded)   || '[]'),
+    stepsRemoved: new Set(JSON.parse(localStorage.getItem(k.stepsRemoved) || '[]')),
+  };
+}
+
+function saveCurrentOpp() {
+  const k = SK.opp(state.activeOppId);
+  localStorage.setItem(k.used,         JSON.stringify([...state.used]));
+  localStorage.setItem(k.added,        JSON.stringify(state.added));
+  localStorage.setItem(k.removed,      JSON.stringify([...state.removed]));
+  localStorage.setItem(k.stepsUsed,    JSON.stringify([...state.stepsUsed]));
+  localStorage.setItem(k.stepsAdded,   JSON.stringify(state.stepsAdded));
+  localStorage.setItem(k.stepsRemoved, JSON.stringify([...state.stepsRemoved]));
+}
+
+// ── State init ────────────────────────────────────────
+
+let opps = JSON.parse(localStorage.getItem(SK.opps) || '[]');
+if (opps.length === 0) {
+  const id = 'opp_' + Date.now();
+  opps = [{ id, name: 'My First Deal', createdAt: Date.now() }];
+  localStorage.setItem(SK.opps, JSON.stringify(opps));
+  localStorage.setItem(SK.activeOpp, id);
+}
+
+const savedActiveId = localStorage.getItem(SK.activeOpp);
+const initialOppId  = opps.find(o => o.id === savedActiveId) ? savedActiveId : opps[0].id;
 
 const state = {
-  // Prompts
-  used:    new Set(JSON.parse(localStorage.getItem(SK.used)    || '[]')),
-  added:       JSON.parse(localStorage.getItem(SK.added)   || '[]'),
-  removed: new Set(JSON.parse(localStorage.getItem(SK.removed) || '[]')),
-  // Steps
-  stepsUsed:    new Set(JSON.parse(localStorage.getItem(SK.stepsUsed)    || '[]')),
-  stepsAdded:       JSON.parse(localStorage.getItem(SK.stepsAdded)   || '[]'),
-  stepsRemoved: new Set(JSON.parse(localStorage.getItem(SK.stepsRemoved) || '[]')),
-  // Navigation
-  activeStageId: STAGES[0].id,
-  activeCondId:  STAGES[0].conditions[0].id, // '__steps__' when Steps tab active
+  opps,
+  activeOppId: initialOppId,
+  ...loadOppState(initialOppId),
+  activeStageId:   STAGES[0].id,
+  activeCondId:    STAGES[0].conditions[0].id,
+  oppDropdownOpen: false,
 };
 
-function save() {
-  localStorage.setItem(SK.used,         JSON.stringify([...state.used]));
-  localStorage.setItem(SK.added,        JSON.stringify(state.added));
-  localStorage.setItem(SK.removed,      JSON.stringify([...state.removed]));
-  localStorage.setItem(SK.stepsUsed,    JSON.stringify([...state.stepsUsed]));
-  localStorage.setItem(SK.stepsAdded,   JSON.stringify(state.stepsAdded));
-  localStorage.setItem(SK.stepsRemoved, JSON.stringify([...state.stepsRemoved]));
+// ── Opportunity actions ───────────────────────────────
+
+function switchOpp(id) {
+  saveCurrentOpp();
+  state.activeOppId = id;
+  Object.assign(state, loadOppState(id));
+  localStorage.setItem(SK.activeOpp, id);
+  state.oppDropdownOpen = false;
+  render();
+}
+
+function createOpp(name) {
+  saveCurrentOpp();
+  const id  = 'opp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5);
+  const opp = { id, name: name.trim(), createdAt: Date.now() };
+  state.opps.push(opp);
+  localStorage.setItem(SK.opps, JSON.stringify(state.opps));
+  state.activeOppId   = id;
+  state.used          = new Set();
+  state.added         = [];
+  state.removed       = new Set();
+  state.stepsUsed     = new Set();
+  state.stepsAdded    = [];
+  state.stepsRemoved  = new Set();
+  localStorage.setItem(SK.activeOpp, id);
+  saveCurrentOpp();
+  state.oppDropdownOpen = false;
+  render();
+}
+
+function deleteOpp(id) {
+  if (state.opps.length <= 1) return;
+  const k = SK.opp(id);
+  Object.values(k).forEach(key => localStorage.removeItem(key));
+  state.opps = state.opps.filter(o => o.id !== id);
+  localStorage.setItem(SK.opps, JSON.stringify(state.opps));
+  if (state.activeOppId === id) {
+    const next = state.opps[0];
+    state.activeOppId = next.id;
+    Object.assign(state, loadOppState(next.id));
+    localStorage.setItem(SK.activeOpp, next.id);
+  }
+  render();
 }
 
 // ── Data helpers ──────────────────────────────────────
@@ -50,26 +141,60 @@ function effectiveSteps(stage) {
 
 function stageStats(stage) {
   const prompts = stage.conditions.flatMap(c => effectivePrompts(c));
-  return {
-    total: prompts.length,
-    used:  prompts.filter(p => state.used.has(p.id)).length,
-  };
+  return { total: prompts.length, used: prompts.filter(p => state.used.has(p.id)).length };
 }
 
 function condStats(cond) {
   const prompts = effectivePrompts(cond);
-  return {
-    total: prompts.length,
-    used:  prompts.filter(p => state.used.has(p.id)).length,
-  };
+  return { total: prompts.length, used: prompts.filter(p => state.used.has(p.id)).length };
 }
 
 function stepStats(stage) {
   const steps = effectiveSteps(stage);
-  return {
-    total: steps.length,
-    used:  steps.filter(s => state.stepsUsed.has(s.id)).length,
-  };
+  return { total: steps.length, used: steps.filter(s => state.stepsUsed.has(s.id)).length };
+}
+
+// ── Render: Opportunity selector ──────────────────────
+
+function renderOppSelector() {
+  const activeOpp = state.opps.find(o => o.id === state.activeOppId);
+  document.getElementById('opp-name-display').textContent = activeOpp?.name || '—';
+
+  const selector = document.getElementById('opp-selector');
+  const dropdown = document.getElementById('opp-dropdown');
+
+  if (state.oppDropdownOpen) {
+    selector.classList.add('open');
+    dropdown.classList.remove('hidden');
+    const canDelete = state.opps.length > 1;
+    dropdown.innerHTML =
+      state.opps.map(o => `
+        <div class="opp-item ${o.id === state.activeOppId ? 'active' : ''}" data-opp-id="${o.id}">
+          <svg class="opp-check-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6L5 9L10 3" stroke="#22c55e" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="opp-item-name">${escHtml(o.name)}</span>
+          ${canDelete ? `
+            <button class="opp-delete-btn" data-delete-opp="${o.id}" title="Delete">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor"
+                      stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>` : ''}
+        </div>`).join('') +
+      `<div class="opp-dropdown-divider"></div>
+       <button class="opp-new-btn" id="opp-new-trigger">
+         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+           <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round"/>
+         </svg>
+         New Opportunity
+       </button>`;
+  } else {
+    selector.classList.remove('open');
+    dropdown.classList.add('hidden');
+  }
 }
 
 // ── Render: Sidebar ───────────────────────────────────
@@ -101,7 +226,6 @@ function renderHeader(stage) {
   document.getElementById('stage-header-icon').textContent  = stage.icon;
   document.getElementById('stage-header-title').textContent = stage.name;
   document.getElementById('reset-stage-btn').dataset.stage  = stage.id;
-
   if (state.activeCondId === '__steps__') {
     const { total, used } = stepStats(stage);
     document.getElementById('stage-stats').textContent = `${used} of ${total} steps completed`;
@@ -126,26 +250,23 @@ function renderTabs(stage) {
   }).join('');
 
   const { total: sTotal, used: sUsed } = stepStats(stage);
-  const pct = sTotal ? Math.round((sUsed / sTotal) * 100) : 0;
+  const pct       = sTotal ? Math.round((sUsed / sTotal) * 100) : 0;
   const stepState = pct === 100 ? 'complete' : pct > 0 ? 'in-progress' : '';
-  const stepsActive = state.activeCondId === '__steps__';
 
-  const stepsTab = `
+  document.getElementById('condition-tabs').innerHTML = condTabs + `
     <div class="steps-tab-divider"></div>
-    <div class="cond-tab steps-tab ${stepsActive ? 'active' : ''} ${stepState}"
+    <div class="cond-tab steps-tab ${state.activeCondId === '__steps__' ? 'active' : ''} ${stepState}"
          style="--active-color:${stage.color}" data-cond="__steps__">
       Steps
       <span class="steps-tab-pct">${pct}%</span>
     </div>`;
-
-  document.getElementById('condition-tabs').innerHTML = condTabs + stepsTab;
 }
 
 // ── Render: Prompts ───────────────────────────────────
 
 function renderPrompts(stage) {
   document.getElementById('condition-banner').style.display = '';
-  document.getElementById('prompts-grid').style.display = '';
+  document.getElementById('prompts-grid').style.display     = '';
   document.getElementById('steps-view').classList.add('hidden');
 
   const cond = stage.conditions.find(c => c.id === state.activeCondId);
@@ -181,22 +302,20 @@ function renderPrompts(stage) {
       </div>`;
   }).join('');
 
-  const addBtn = `
+  document.getElementById('prompts-grid').innerHTML = cards + `
     <button class="add-prompt-btn" data-add-prompt="${cond.id}" style="--add-color:${stage.color}">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Add Prompt
     </button>`;
-
-  document.getElementById('prompts-grid').innerHTML = cards + addBtn;
 }
 
 // ── Render: Steps ─────────────────────────────────────
 
 function renderSteps(stage) {
   document.getElementById('condition-banner').style.display = 'none';
-  document.getElementById('prompts-grid').style.display = 'none';
+  document.getElementById('prompts-grid').style.display     = 'none';
   document.getElementById('steps-view').classList.remove('hidden');
 
   const steps = effectiveSteps(stage);
@@ -204,11 +323,11 @@ function renderSteps(stage) {
   const total = steps.length;
   const pct   = total ? Math.round((used / total) * 100) : 0;
 
-  document.getElementById('steps-count-label').textContent = `${used} of ${total} steps completed`;
-  document.getElementById('steps-pct-label').textContent   = `${pct}%`;
-  document.getElementById('steps-pct-label').style.color   = stage.color;
-  document.getElementById('steps-progress-fill').style.cssText =
-    `width:${pct}%; background:${stage.color}`;
+  document.getElementById('steps-count-label').textContent       = `${used} of ${total} steps completed`;
+  document.getElementById('steps-pct-label').textContent         = `${pct}%`;
+  document.getElementById('steps-pct-label').style.color         = stage.color;
+  document.getElementById('steps-progress-fill').style.cssText   =
+    `width:${pct}%;background:${stage.color}`;
 
   const cards = steps.map(s => {
     const done = state.stepsUsed.has(s.id);
@@ -233,65 +352,64 @@ function renderSteps(stage) {
       </div>`;
   }).join('');
 
-  const addBtn = `
+  document.getElementById('steps-grid').innerHTML = cards + `
     <button class="add-prompt-btn" data-add-step="${stage.id}" style="--add-color:${stage.color}">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Add Step
     </button>`;
-
-  document.getElementById('steps-grid').innerHTML = cards + addBtn;
 }
 
 // ── Full render ───────────────────────────────────────
 
 function render() {
   const stage = STAGES.find(s => s.id === state.activeStageId);
+  renderOppSelector();
   renderSidebar();
   renderHeader(stage);
   renderTabs(stage);
-  if (state.activeCondId === '__steps__') {
-    renderSteps(stage);
-  } else {
-    renderPrompts(stage);
-  }
+  if (state.activeCondId === '__steps__') renderSteps(stage);
+  else renderPrompts(stage);
 }
 
-// ── Modal state ───────────────────────────────────────
+// ── Modal ─────────────────────────────────────────────
 
-// type: 'prompt' | 'step'
 let modal = { type: null, targetId: null };
-let pendingDeleteId   = null;
-let pendingDeleteType = null; // 'prompt' | 'step'
 
 function openModal(type, targetId) {
-  const stage = type === 'step'
-    ? STAGES.find(s => s.id === targetId)
-    : STAGES.find(s => s.conditions.some(c => c.id === targetId));
-
   modal = { type, targetId };
 
-  const accent = stage?.color || '#6366f1';
+  const isOpp  = type === 'opportunity';
   const isStep = type === 'step';
+  const stage  = isStep
+    ? STAGES.find(s => s.id === targetId)
+    : isOpp ? null
+    : STAGES.find(s => s.conditions.some(c => c.id === targetId));
+  const accent = stage?.color || '#6366f1';
 
-  document.getElementById('modal-title').textContent      = isStep ? 'Add Step' : 'Add Prompt';
-  document.getElementById('modal-save').textContent       = isStep ? 'Add Step' : 'Add Prompt';
-  document.getElementById('modal-body-label').textContent = isStep ? 'Description' : 'Prompt Text';
-  document.getElementById('modal-input-body').placeholder = isStep
+  document.getElementById('modal-title').textContent       = isOpp  ? 'New Opportunity' : isStep ? 'Add Step'   : 'Add Prompt';
+  document.getElementById('modal-save').textContent        = isOpp  ? 'Create'           : isStep ? 'Add Step'   : 'Add Prompt';
+  document.getElementById('modal-title-label').textContent = isOpp  ? 'Name'             : 'Title';
+  document.getElementById('modal-body-label').textContent  = isStep ? 'Description'      : 'Prompt Text';
+  document.getElementById('modal-input-title').placeholder = isOpp
+    ? 'e.g. Acme Corp — Q3 2026'
+    : isStep ? 'e.g. Confirm attendees and roles' : 'e.g. ICP Fit Analysis';
+  document.getElementById('modal-input-body').placeholder  = isStep
     ? 'Optional details or instructions…'
     : 'Paste your LLM prompt here…';
+
+  document.getElementById('modal-body-section').classList.toggle('hidden', isOpp);
 
   document.getElementById('modal-input-title').value = '';
   document.getElementById('modal-input-body').value  = '';
   document.getElementById('modal-input-title').classList.remove('error');
   document.querySelector('.modal-error-msg')?.classList.remove('visible');
 
-  const accentProps = ['--modal-accent'];
   [document.getElementById('modal-save'),
    document.getElementById('modal-input-title'),
    document.getElementById('modal-input-body')].forEach(el =>
-     accentProps.forEach(p => el.style.setProperty(p, accent)));
+     el.style.setProperty('--modal-accent', accent));
 
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('modal-input-title').focus();
@@ -313,6 +431,12 @@ function saveItem() {
     return;
   }
 
+  if (modal.type === 'opportunity') {
+    closeModal();
+    createOpp(title);
+    return;
+  }
+
   const body = document.getElementById('modal-input-body').value.trim();
   const id   = (modal.type === 'step' ? 'step_' : 'prompt_') +
                Date.now() + '_' + Math.random().toString(36).slice(2, 7);
@@ -323,30 +447,31 @@ function saveItem() {
     state.added.push({ id, condId: modal.targetId, title, body });
   }
 
-  save();
+  saveCurrentOpp();
   closeModal();
   render();
 }
 
-function openDeleteModal(type, itemId) {
-  pendingDeleteId   = itemId;
-  pendingDeleteType = type;
+// ── Delete modal ──────────────────────────────────────
 
-  let title = itemId;
+let pendingDelete = { id: null, type: null };
+
+function openDeleteModal(type, id) {
+  pendingDelete = { id, type };
+  let title = id;
+
   if (type === 'step') {
-    for (const stage of STAGES) {
-      const s = effectiveSteps(stage).find(s => s.id === itemId);
-      if (s) { title = s.title; break; }
+    for (const s of STAGES) {
+      const found = effectiveSteps(s).find(x => x.id === id);
+      if (found) { title = found.title; break; }
     }
     document.getElementById('delete-title').textContent = 'Remove step?';
     document.getElementById('delete-desc').textContent  =
       `"${title}" will be permanently removed from this stage.`;
   } else {
-    for (const stage of STAGES) {
-      for (const cond of stage.conditions) {
-        const p = effectivePrompts(cond).find(p => p.id === itemId);
-        if (p) { title = p.title; break; }
-      }
+    for (const s of STAGES) for (const c of s.conditions) {
+      const found = effectivePrompts(c).find(x => x.id === id);
+      if (found) { title = found.title; break; }
     }
     document.getElementById('delete-title').textContent = 'Remove prompt?';
     document.getElementById('delete-desc').textContent  =
@@ -358,30 +483,63 @@ function openDeleteModal(type, itemId) {
 
 function closeDeleteModal() {
   document.getElementById('delete-overlay').classList.add('hidden');
-  pendingDeleteId   = null;
-  pendingDeleteType = null;
+  pendingDelete = { id: null, type: null };
 }
 
 function confirmDelete() {
-  if (!pendingDeleteId) return;
+  const { id, type } = pendingDelete;
+  if (!id) return;
 
-  if (pendingDeleteType === 'step') {
-    state.stepsRemoved.add(pendingDeleteId);
-    state.stepsUsed.delete(pendingDeleteId);
-    state.stepsAdded = state.stepsAdded.filter(s => s.id !== pendingDeleteId);
+  if (type === 'step') {
+    state.stepsRemoved.add(id);
+    state.stepsUsed.delete(id);
+    state.stepsAdded = state.stepsAdded.filter(s => s.id !== id);
   } else {
-    state.removed.add(pendingDeleteId);
-    state.used.delete(pendingDeleteId);
-    state.added = state.added.filter(p => p.id !== pendingDeleteId);
+    state.removed.add(id);
+    state.used.delete(id);
+    state.added = state.added.filter(p => p.id !== id);
   }
 
-  save();
+  saveCurrentOpp();
   closeDeleteModal();
   render();
 }
 
 // ── Event delegation ──────────────────────────────────
 
+// Opportunity selector
+document.getElementById('opp-selector').addEventListener('click', e => {
+  if (e.target.closest('#opp-new-trigger')) {
+    state.oppDropdownOpen = false;
+    renderOppSelector();
+    openModal('opportunity', null);
+    return;
+  }
+  const delBtn = e.target.closest('[data-delete-opp]');
+  if (delBtn) {
+    e.stopPropagation();
+    const id   = delBtn.dataset.deleteOpp;
+    const name = state.opps.find(o => o.id === id)?.name || 'this opportunity';
+    if (confirm(`Delete "${name}"? This cannot be undone.`)) deleteOpp(id);
+    return;
+  }
+  const item = e.target.closest('.opp-item');
+  if (item && item.dataset.oppId) { switchOpp(item.dataset.oppId); return; }
+
+  if (e.target.closest('#opp-trigger')) {
+    state.oppDropdownOpen = !state.oppDropdownOpen;
+    renderOppSelector();
+  }
+});
+
+document.addEventListener('click', e => {
+  if (state.oppDropdownOpen && !e.target.closest('#opp-selector')) {
+    state.oppDropdownOpen = false;
+    renderOppSelector();
+  }
+});
+
+// Stage list
 document.getElementById('stage-list').addEventListener('click', e => {
   const item = e.target.closest('.stage-item');
   if (!item) return;
@@ -391,6 +549,7 @@ document.getElementById('stage-list').addEventListener('click', e => {
   render();
 });
 
+// Condition tabs
 document.getElementById('condition-tabs').addEventListener('click', e => {
   const tab = e.target.closest('.cond-tab');
   if (!tab) return;
@@ -409,9 +568,8 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
   const card = e.target.closest('.prompt-card');
   if (!card) return;
   const id = card.dataset.prompt;
-  if (state.used.has(id)) state.used.delete(id);
-  else state.used.add(id);
-  save();
+  if (state.used.has(id)) state.used.delete(id); else state.used.add(id);
+  saveCurrentOpp();
   render();
 });
 
@@ -426,25 +584,25 @@ document.getElementById('steps-grid').addEventListener('click', e => {
   const card = e.target.closest('.prompt-card');
   if (!card) return;
   const id = card.dataset.step;
-  if (state.stepsUsed.has(id)) state.stepsUsed.delete(id);
-  else state.stepsUsed.add(id);
-  save();
+  if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
+  saveCurrentOpp();
   render();
 });
 
+// Reset buttons
 document.getElementById('reset-stage-btn').addEventListener('click', () => {
   const stage = STAGES.find(s => s.id === state.activeStageId);
   stage.conditions.forEach(c => effectivePrompts(c).forEach(p => state.used.delete(p.id)));
   effectiveSteps(stage).forEach(s => state.stepsUsed.delete(s.id));
-  save();
+  saveCurrentOpp();
   render();
 });
 
 document.getElementById('reset-all-btn').addEventListener('click', () => {
-  if (!confirm('Reset all used prompts and steps across every stage?')) return;
+  if (!confirm('Reset all used prompts and steps for this opportunity?')) return;
   state.used.clear();
   state.stepsUsed.clear();
-  save();
+  saveCurrentOpp();
   render();
 });
 
@@ -456,10 +614,9 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 });
 
-// Error message element
 const errorEl = document.createElement('span');
 errorEl.className = 'modal-error-msg';
-errorEl.textContent = 'Please enter a title.';
+errorEl.textContent = 'Please enter a name.';
 document.getElementById('modal-input-title').insertAdjacentElement('afterend', errorEl);
 
 document.getElementById('modal-input-title').addEventListener('input', () => {
@@ -480,6 +637,7 @@ document.getElementById('delete-overlay').addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
   if (!document.getElementById('modal-overlay').classList.contains('hidden'))  closeModal();
   if (!document.getElementById('delete-overlay').classList.contains('hidden')) closeDeleteModal();
 });

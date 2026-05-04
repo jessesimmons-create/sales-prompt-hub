@@ -32,13 +32,15 @@ body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: visible;
   scrollbar-width: thin;
   scrollbar-color: #1e293b transparent;
 }
 
 #sidebar-header {
-  padding: 22px 18px 14px;
+  padding: 16px 14px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
+  position: relative;
 }
 
 #sidebar-header .app-label {
@@ -47,15 +49,141 @@ body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #475569;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
-#sidebar-header h1 {
-  font-size: 15px;
-  font-weight: 700;
-  color: #f1f5f9;
-  line-height: 1.2;
+/* ── Opportunity selector ─────────────────────────────── */
+
+#opp-selector { position: relative; }
+
+#opp-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e2e8f0;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
 }
+
+#opp-trigger:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.18);
+}
+
+#opp-name-display {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opp-chevron {
+  flex-shrink: 0;
+  color: #475569;
+  transition: transform 0.2s ease;
+}
+
+#opp-selector.open .opp-chevron { transform: rotate(180deg); }
+
+#opp-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  z-index: 200;
+  overflow: hidden;
+  animation: dropDown 0.15s ease;
+}
+
+#opp-dropdown.hidden { display: none; }
+
+@keyframes dropDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.opp-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #94a3b8;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+}
+
+.opp-item:hover { background: rgba(255,255,255,0.05); color: #f1f5f9; }
+.opp-item.active { color: #f1f5f9; font-weight: 500; }
+
+.opp-check-icon { flex-shrink: 0; }
+.opp-item:not(.active) .opp-check-icon { visibility: hidden; }
+
+.opp-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opp-delete-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.opp-item:hover .opp-delete-btn { opacity: 1; }
+.opp-delete-btn:hover { background: rgba(239,68,68,0.15); color: #f87171; }
+
+.opp-dropdown-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+  margin: 3px 0;
+}
+
+.opp-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.opp-new-btn:hover { background: rgba(255,255,255,0.05); color: #f1f5f9; }
+
+/* ── Stage list ───────────────────────────────────────── */
 
 #stage-list { padding: 8px 0; flex: 1; }
 
@@ -258,7 +386,6 @@ body {
   color: #15803d;
 }
 
-/* Steps tab separator + styling */
 .steps-tab-divider {
   width: 1px;
   background: var(--border);
@@ -266,9 +393,7 @@ body {
   flex-shrink: 0;
 }
 
-.steps-tab {
-  margin-left: 4px;
-}
+.steps-tab { margin-left: 4px; }
 
 .steps-tab-pct {
   font-size: 10px;
@@ -339,18 +464,8 @@ body {
   margin-bottom: 10px;
 }
 
-#steps-count-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-#steps-pct-label {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--step-color, #64748b);
-  font-variant-numeric: tabular-nums;
-}
+#steps-count-label { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+#steps-pct-label { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 #steps-progress-track {
   height: 8px;
@@ -362,7 +477,6 @@ body {
 #steps-progress-fill {
   height: 100%;
   border-radius: 99px;
-  background: var(--step-color, #64748b);
   transition: width 0.35s ease;
 }
 
@@ -415,10 +529,7 @@ body {
   transition: background 0.15s, border-color 0.15s;
 }
 
-.prompt-card.used .prompt-check {
-  background: #22c55e;
-  border-color: #22c55e;
-}
+.prompt-card.used .prompt-check { background: #22c55e; border-color: #22c55e; }
 
 .check-icon { display: none; width: 11px; height: 11px; }
 .prompt-card.used .check-icon { display: block; }
@@ -480,13 +591,8 @@ body {
 }
 
 .prompt-card:hover .prompt-delete-btn { opacity: 1; }
+.prompt-delete-btn:hover { background: #fee2e2; color: #ef4444; }
 
-.prompt-delete-btn:hover {
-  background: #fee2e2;
-  color: #ef4444;
-}
-
-/* Add button */
 .add-prompt-btn {
   display: flex;
   align-items: center;
@@ -521,17 +627,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 300;
   animation: fadeIn 0.15s ease;
 }
 
 #modal-overlay.hidden,
 #delete-overlay.hidden { display: none; }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
@@ -555,11 +658,7 @@ body {
   padding: 20px 24px 0;
 }
 
-#modal-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
+#modal-title { font-size: 16px; font-weight: 700; color: var(--text); }
 
 #modal-close {
   width: 28px;
@@ -591,11 +690,14 @@ body {
   color: var(--text-muted);
   letter-spacing: 0.03em;
   margin-top: 10px;
+  display: block;
 }
 
 #modal-body label:first-child { margin-top: 0; }
 #modal-body .required { color: #ef4444; }
 #modal-body .optional { font-weight: 400; color: #94a3b8; }
+
+#modal-body-section.hidden { display: none; }
 
 #modal-input-title,
 #modal-input-body {
@@ -624,13 +726,7 @@ body {
   box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
 }
 
-.modal-error-msg {
-  font-size: 11px;
-  color: #ef4444;
-  margin-top: 2px;
-  display: none;
-}
-
+.modal-error-msg { font-size: 11px; color: #ef4444; margin-top: 2px; display: none; }
 .modal-error-msg.visible { display: block; }
 
 #modal-footer {
@@ -653,17 +749,9 @@ body {
 
 #delete-icon { font-size: 32px; margin-bottom: 12px; }
 #delete-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-
-#delete-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.5;
-  margin-bottom: 20px;
-}
-
+#delete-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px; }
 #delete-footer { display: flex; gap: 8px; justify-content: center; }
 
-/* Shared buttons */
 .btn-primary {
   padding: 8px 18px;
   font-size: 13px;
