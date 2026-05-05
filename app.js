@@ -4,6 +4,7 @@ const SK = {
   opps:      'sph_opps',
   activeOpp: 'sph_active_opp',
   role:      'sph_role',
+  users:     'sph_users',
   opp: id => ({
     used:         `sph_${id}_used`,
     added:        `sph_${id}_added`,
@@ -80,6 +81,7 @@ const state = {
   activeCondId:    STAGES[0].conditions[0].id,
   oppDropdownOpen: false,
   role:            localStorage.getItem(SK.role) || 'admin',
+  users:           JSON.parse(localStorage.getItem(SK.users) || '[]'),
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -125,6 +127,63 @@ function deleteOpp(id) {
     localStorage.setItem(SK.activeOpp, next.id);
   }
   render();
+}
+
+// ── User management ───────────────────────────────────
+
+function saveUsers() {
+  localStorage.setItem(SK.users, JSON.stringify(state.users));
+}
+
+function addUser(email, role) {
+  if (state.users.find(u => u.email.toLowerCase() === email.toLowerCase())) return false;
+  state.users.push({ email: email.trim().toLowerCase(), role });
+  saveUsers();
+  return true;
+}
+
+function removeUser(email) {
+  state.users = state.users.filter(u => u.email !== email);
+  saveUsers();
+}
+
+function toggleUserRole(email) {
+  const user = state.users.find(u => u.email === email);
+  if (user) { user.role = user.role === 'admin' ? 'standard' : 'admin'; saveUsers(); }
+}
+
+function openUsersModal() {
+  renderUsersModal();
+  document.getElementById('users-overlay').classList.remove('hidden');
+  document.getElementById('users-add-email').focus();
+}
+
+function closeUsersModal() {
+  document.getElementById('users-overlay').classList.add('hidden');
+  document.getElementById('users-add-email').value = '';
+  document.getElementById('users-add-role-btn').dataset.role = 'standard';
+  document.getElementById('users-add-role-btn').textContent = 'Standard';
+  document.getElementById('users-add-error').classList.add('hidden');
+}
+
+function renderUsersModal() {
+  const list = document.getElementById('users-list');
+  if (state.users.length === 0) {
+    list.innerHTML = '<p id="users-empty">No users added yet.</p>';
+    return;
+  }
+  list.innerHTML = state.users.map(u => `
+    <div class="user-row">
+      <span class="user-email">${escHtml(u.email)}</span>
+      <button class="user-role-btn ${u.role}" data-toggle-role="${escHtml(u.email)}">
+        ${u.role === 'admin' ? 'Admin' : 'Standard'}
+      </button>
+      <button class="user-remove-btn" data-remove-user="${escHtml(u.email)}" title="Remove user">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>`).join('');
 }
 
 // ── Data helpers ──────────────────────────────────────
@@ -206,6 +265,7 @@ function renderRoleToggle() {
   document.getElementById('role-icon').textContent  = isAdmin ? '🔓' : '🔒';
   document.getElementById('role-label').textContent = isAdmin ? 'Admin' : 'Standard User';
   document.getElementById('role-toggle').classList.toggle('is-admin', isAdmin);
+  document.getElementById('manage-users-btn').classList.toggle('hidden', !isAdmin);
 }
 
 // ── Render: Sidebar ───────────────────────────────────
@@ -659,9 +719,59 @@ document.getElementById('delete-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('delete-overlay')) closeDeleteModal();
 });
 
+// Users modal
+document.getElementById('manage-users-btn').addEventListener('click', openUsersModal);
+document.getElementById('users-modal-close').addEventListener('click', closeUsersModal);
+document.getElementById('users-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('users-overlay')) closeUsersModal();
+});
+
+document.getElementById('users-add-role-btn').addEventListener('click', () => {
+  const btn = document.getElementById('users-add-role-btn');
+  const next = btn.dataset.role === 'standard' ? 'admin' : 'standard';
+  btn.dataset.role = next;
+  btn.textContent  = next === 'admin' ? 'Admin' : 'Standard';
+});
+
+document.getElementById('users-add-btn').addEventListener('click', () => {
+  const emailEl = document.getElementById('users-add-email');
+  const errorEl = document.getElementById('users-add-error');
+  const email   = emailEl.value.trim();
+  const role    = document.getElementById('users-add-role-btn').dataset.role;
+  const valid   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  if (!valid) { errorEl.classList.remove('hidden'); emailEl.focus(); return; }
+  errorEl.classList.add('hidden');
+
+  if (!addUser(email, role)) {
+    errorEl.textContent = 'That email is already in the list.';
+    errorEl.classList.remove('hidden');
+    emailEl.focus();
+    return;
+  }
+  errorEl.textContent = 'Please enter a valid email address.';
+  emailEl.value = '';
+  document.getElementById('users-add-role-btn').dataset.role = 'standard';
+  document.getElementById('users-add-role-btn').textContent  = 'Standard';
+  renderUsersModal();
+  emailEl.focus();
+});
+
+document.getElementById('users-add-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('users-add-btn').click();
+});
+
+document.getElementById('users-list').addEventListener('click', e => {
+  const toggleBtn = e.target.closest('[data-toggle-role]');
+  if (toggleBtn) { toggleUserRole(toggleBtn.dataset.toggleRole); renderUsersModal(); return; }
+  const removeBtn = e.target.closest('[data-remove-user]');
+  if (removeBtn) { removeUser(removeBtn.dataset.removeUser); renderUsersModal(); return; }
+});
+
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
+  if (!document.getElementById('users-overlay').classList.contains('hidden'))  { closeUsersModal(); return; }
   if (!document.getElementById('modal-overlay').classList.contains('hidden'))  closeModal();
   if (!document.getElementById('delete-overlay').classList.contains('hidden')) closeDeleteModal();
 });
