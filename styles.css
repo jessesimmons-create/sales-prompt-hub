@@ -656,6 +656,40 @@ body {
 .prompt-card:hover .prompt-delete-btn { opacity: 1; }
 .prompt-delete-btn:hover { background: #fee2e2; color: #ef4444; }
 
+/* ── Step card footer (comments) ──────────────────────── */
+
+.step-card { padding-bottom: 0; }
+
+.step-card-footer {
+  margin-top: 12px;
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--border);
+}
+
+.step-comments-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.12s, background 0.12s;
+}
+
+.step-comments-btn:hover { color: var(--text-muted); background: #f1f5f9; }
+.step-comments-btn.has-comments { color: #6366f1; font-weight: 600; }
+.step-comments-btn.has-comments svg { stroke: #6366f1; }
+.prompt-card.used .step-card-footer { border-top-color: #bbf7d0; }
+.prompt-card.used .step-comments-btn { color: #86efac; }
+.prompt-card.used .step-comments-btn:hover { color: #4ade80; background: rgba(255,255,255,0.3); }
+.prompt-card.used .step-comments-btn.has-comments { color: #15803d; }
+
 .add-prompt-btn {
   display: flex;
   align-items: center;
@@ -681,6 +715,7 @@ body {
 
 /* ── Modals ───────────────────────────────────────────── */
 
+#comments-overlay,
 #users-overlay,
 #modal-overlay,
 #delete-overlay {
@@ -695,9 +730,205 @@ body {
   animation: fadeIn 0.15s ease;
 }
 
+#comments-overlay.hidden,
 #users-overlay.hidden,
 #modal-overlay.hidden,
 #delete-overlay.hidden { display: none; }
+
+/* ── Comments modal ───────────────────────────────────── */
+
+#comments-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  animation: slideUp 0.18s ease;
+  overflow: hidden;
+}
+
+#comments-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+#comments-modal-step-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+#comments-modal-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+#comments-modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+#comments-modal-close:hover { background: #e2e8f0; color: var(--text); }
+
+#comments-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  min-height: 60px;
+}
+
+#comments-empty {
+  padding: 28px 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.comment-card {
+  padding: 14px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.comment-card:last-child { border-bottom: none; }
+.comment-card:hover { background: #fafbfc; }
+
+.comment-body {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.comment-body p { margin: 0 0 6px; }
+.comment-body p:last-child { margin-bottom: 0; }
+.comment-body a { color: #6366f1; text-decoration: underline; }
+.comment-body a:hover { color: #4f46e5; }
+.comment-body strong { font-weight: 700; }
+.comment-body em { font-style: italic; }
+.comment-body u { text-decoration: underline; }
+.comment-body ul, .comment-body ol { padding-left: 20px; margin: 4px 0; }
+.comment-body li { margin: 2px 0; }
+
+.comment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.comment-date {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.comment-delete-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+
+.comment-card:hover .comment-delete-btn { opacity: 1; }
+.comment-delete-btn:hover { background: #fee2e2; color: #ef4444; }
+
+#comments-editor-section {
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#comments-editor {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  font-size: 13.5px;
+}
+
+#comments-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--border);
+}
+
+#comments-add-btn {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #6366f1;
+  border: none;
+  color: #fff;
+  transition: background 0.15s;
+}
+
+#comments-add-btn:hover { background: #4f46e5; }
+
+/* ── Quill overrides ──────────────────────────────────── */
+
+#comments-editor .ql-toolbar {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  background: #f8fafc;
+}
+
+#comments-editor .ql-container {
+  border: none;
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+#comments-editor .ql-editor {
+  min-height: 90px;
+  max-height: 160px;
+  padding: 12px 16px;
+  line-height: 1.6;
+}
+
+#comments-editor .ql-editor.ql-blank::before {
+  color: var(--text-light);
+  font-style: normal;
+  font-size: 13.5px;
+}
+
+#comments-editor .ql-toolbar .ql-stroke { stroke: var(--text-muted); }
+#comments-editor .ql-toolbar .ql-fill  { fill:   var(--text-muted); }
+#comments-editor .ql-toolbar button:hover .ql-stroke { stroke: #6366f1; }
+#comments-editor .ql-toolbar button:hover .ql-fill  { fill:   #6366f1; }
+#comments-editor .ql-toolbar button.ql-active .ql-stroke { stroke: #6366f1; }
+#comments-editor .ql-toolbar button.ql-active .ql-fill  { fill:   #6366f1; }
 
 /* ── Users modal ──────────────────────────────────────── */
 

@@ -12,6 +12,7 @@ const SK = {
     stepsUsed:    `sph_${id}_steps_used`,
     stepsAdded:   `sph_${id}_steps_added`,
     stepsRemoved: `sph_${id}_steps_removed`,
+    comments:     `sph_${id}_comments`,
   }),
 };
 
@@ -47,6 +48,7 @@ function loadOppState(id) {
     stepsUsed:    new Set(JSON.parse(localStorage.getItem(k.stepsUsed)    || '[]')),
     stepsAdded:        JSON.parse(localStorage.getItem(k.stepsAdded)   || '[]'),
     stepsRemoved: new Set(JSON.parse(localStorage.getItem(k.stepsRemoved) || '[]')),
+    comments:          JSON.parse(localStorage.getItem(k.comments)     || '[]'),
   };
 }
 
@@ -58,6 +60,7 @@ function saveCurrentOpp() {
   localStorage.setItem(k.stepsUsed,    JSON.stringify([...state.stepsUsed]));
   localStorage.setItem(k.stepsAdded,   JSON.stringify(state.stepsAdded));
   localStorage.setItem(k.stepsRemoved, JSON.stringify([...state.stepsRemoved]));
+  localStorage.setItem(k.comments,     JSON.stringify(state.comments));
 }
 
 // ── State init ────────────────────────────────────────
@@ -108,6 +111,7 @@ function createOpp(name) {
   state.stepsUsed     = new Set();
   state.stepsAdded    = [];
   state.stepsRemoved  = new Set();
+  state.comments      = [];
   localStorage.setItem(SK.activeOpp, id);
   saveCurrentOpp();
   state.oppDropdownOpen = false;
@@ -183,6 +187,68 @@ function renderUsersModal() {
           <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
+    </div>`).join('');
+}
+
+// ── Comments ──────────────────────────────────────────
+
+let commentsStepId = null;
+
+function addComment(stepId, html) {
+  const id = 'cmt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  state.comments.push({ id, stepId, html, createdAt: Date.now() });
+  saveCurrentOpp();
+}
+
+function removeComment(id) {
+  state.comments = state.comments.filter(c => c.id !== id);
+  saveCurrentOpp();
+}
+
+function formatCommentDate(ts) {
+  return new Date(ts).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
+
+function openCommentsModal(stepId) {
+  commentsStepId = stepId;
+  let stepTitle = stepId;
+  for (const s of STAGES) {
+    const found = effectiveSteps(s).find(x => x.id === stepId);
+    if (found) { stepTitle = found.title; break; }
+  }
+  document.getElementById('comments-modal-step-name').textContent = stepTitle;
+  renderCommentsModal();
+  document.getElementById('comments-overlay').classList.remove('hidden');
+  commentsQuill.focus();
+}
+
+function closeCommentsModal() {
+  document.getElementById('comments-overlay').classList.add('hidden');
+  commentsStepId = null;
+  commentsQuill.setContents([]);
+}
+
+function renderCommentsModal() {
+  const list = document.getElementById('comments-list');
+  const mine = state.comments.filter(c => c.stepId === commentsStepId);
+  if (mine.length === 0) {
+    list.innerHTML = '<p id="comments-empty">No comments yet.</p>';
+    return;
+  }
+  list.innerHTML = mine.map(c => `
+    <div class="comment-card" data-comment-id="${c.id}">
+      <div class="comment-body">${c.html}</div>
+      <div class="comment-footer">
+        <span class="comment-date">${formatCommentDate(c.createdAt)}</span>
+        <button class="comment-delete-btn" data-delete-comment="${c.id}" title="Delete comment">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
     </div>`).join('');
 }
 
@@ -406,8 +472,9 @@ function renderSteps(stage) {
 
   const cards = steps.map(s => {
     const done = state.stepsUsed.has(s.id);
+    const commentCount = state.comments.filter(c => c.stepId === s.id).length;
     return `
-      <div class="prompt-card ${done ? 'used' : ''}" data-step="${s.id}">
+      <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
         <div class="prompt-card-top">
           <div class="prompt-check">
             <svg class="check-icon" viewBox="0 0 11 11" fill="none">
@@ -425,6 +492,15 @@ function renderSteps(stage) {
                   stroke-linecap="round"/>
           </svg>
         </button>` : ''}
+        <div class="step-card-footer">
+          <button class="step-comments-btn ${commentCount > 0 ? 'has-comments' : ''}" data-comments-step="${s.id}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z"
+                    stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+            ${commentCount > 0 ? `${commentCount} comment${commentCount !== 1 ? 's' : ''}` : 'Add comment'}
+          </button>
+        </div>
       </div>`;
   }).join('');
 
@@ -653,6 +729,9 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
 
 // Steps grid
 document.getElementById('steps-grid').addEventListener('click', e => {
+  const commentBtn = e.target.closest('[data-comments-step]');
+  if (commentBtn) { openCommentsModal(commentBtn.dataset.commentsStep); return; }
+
   const delBtn = e.target.closest('[data-delete-step]');
   if (delBtn) { e.stopPropagation(); openDeleteModal('step', delBtn.dataset.deleteStep); return; }
 
@@ -660,7 +739,7 @@ document.getElementById('steps-grid').addEventListener('click', e => {
   if (addBtn) { openModal('step', addBtn.dataset.addStep); return; }
 
   const card = e.target.closest('.prompt-card');
-  if (!card) return;
+  if (!card || e.target.closest('.step-card-footer')) return;
   const id = card.dataset.step;
   if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
   saveCurrentOpp();
@@ -771,9 +850,71 @@ document.getElementById('users-list').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
-  if (!document.getElementById('users-overlay').classList.contains('hidden'))  { closeUsersModal(); return; }
-  if (!document.getElementById('modal-overlay').classList.contains('hidden'))  closeModal();
-  if (!document.getElementById('delete-overlay').classList.contains('hidden')) closeDeleteModal();
+  if (!document.getElementById('comments-overlay').classList.contains('hidden')) { closeCommentsModal(); return; }
+  if (!document.getElementById('users-overlay').classList.contains('hidden'))   { closeUsersModal(); return; }
+  if (!document.getElementById('modal-overlay').classList.contains('hidden'))   closeModal();
+  if (!document.getElementById('delete-overlay').classList.contains('hidden'))  closeDeleteModal();
+});
+
+// Comments modal events
+document.getElementById('comments-modal-close').addEventListener('click', closeCommentsModal);
+document.getElementById('comments-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('comments-overlay')) closeCommentsModal();
+});
+
+document.getElementById('comments-list').addEventListener('click', e => {
+  const btn = e.target.closest('[data-delete-comment]');
+  if (!btn) return;
+  removeComment(btn.dataset.deleteComment);
+  renderCommentsModal();
+  render();
+});
+
+document.getElementById('comments-add-btn').addEventListener('click', () => {
+  if (!commentsStepId) return;
+  const html = commentsQuill.root.innerHTML;
+  if (commentsQuill.getText().trim() === '') return;
+  addComment(commentsStepId, html);
+  commentsQuill.setContents([]);
+  renderCommentsModal();
+  render();
+});
+
+// ── Quill rich text editor ────────────────────────────
+
+const commentsQuill = new Quill('#comments-editor', {
+  theme: 'snow',
+  placeholder: 'Write a comment…',
+  modules: {
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      ['link'],
+      [{ list: 'bullet' }, { list: 'ordered' }],
+      ['clean'],
+    ],
+  },
+});
+
+// Auto-linkify URLs as the user types
+commentsQuill.on('text-change', (delta) => {
+  const inserted = delta.ops.some(op => op.insert && /\s/.test(op.insert));
+  if (!inserted) return;
+  const text = commentsQuill.getText();
+  const urlRe = /https?:\/\/[^\s<>"']+/g;
+  let m;
+  while ((m = urlRe.exec(text)) !== null) {
+    const fmt = commentsQuill.getFormat(m.index, m[0].length);
+    if (!fmt.link) {
+      commentsQuill.formatText(m.index, m[0].length, 'link', m[0], 'api');
+    }
+  }
+});
+
+// Submit on Ctrl/Cmd+Enter
+commentsQuill.root.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    document.getElementById('comments-add-btn').click();
+  }
 });
 
 // ── Helpers ───────────────────────────────────────────

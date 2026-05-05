@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sales Prompt Hub</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css" />
 </head>
 <body>
 
@@ -113,6 +114,26 @@
     </div>
   </div>
 
+  <!-- Comments Modal -->
+  <div id="comments-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div id="comments-modal">
+      <div id="comments-modal-header">
+        <div>
+          <div id="comments-modal-step-name"></div>
+          <div id="comments-modal-subtitle">Comments</div>
+        </div>
+        <button id="comments-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="comments-list"></div>
+      <div id="comments-editor-section">
+        <div id="comments-editor"></div>
+        <div id="comments-editor-footer">
+          <button id="comments-add-btn">Add Comment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Users Modal -->
   <div id="users-overlay" class="hidden" role="dialog" aria-modal="true">
     <div id="users-modal">
@@ -130,6 +151,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
