@@ -78,6 +78,47 @@
         <div id="steps-grid"></div>
       </div>
     </div>
+
+    <!-- Cover Page -->
+    <div id="cover-view" style="display:none">
+      <div id="cover-hero">
+        <div id="cover-hero-inner">
+          <div id="cover-opp-icon">🎯</div>
+          <h1 id="cover-opp-name"></h1>
+        </div>
+      </div>
+      <div id="cover-body">
+        <section class="cover-section">
+          <h3 class="cover-section-title">Deal Details</h3>
+          <div class="cover-fields-grid">
+            <div class="cover-field">
+              <label class="cover-label">Company</label>
+              <input class="cover-input" id="cover-company" data-cover-field="company" type="text" placeholder="e.g. Acme Corp" autocomplete="off" />
+            </div>
+            <div class="cover-field">
+              <label class="cover-label">Primary Contact</label>
+              <input class="cover-input" id="cover-contact" data-cover-field="contact" type="text" placeholder="e.g. Jane Smith, VP Sales" autocomplete="off" />
+            </div>
+            <div class="cover-field">
+              <label class="cover-label">Deal Value</label>
+              <input class="cover-input" id="cover-deal-value" data-cover-field="dealValue" type="text" placeholder="e.g. $120,000 ARR" autocomplete="off" />
+            </div>
+            <div class="cover-field">
+              <label class="cover-label">Expected Close</label>
+              <input class="cover-input" id="cover-close-date" data-cover-field="closeDate" type="text" placeholder="e.g. Q3 2026" autocomplete="off" />
+            </div>
+          </div>
+        </section>
+        <section class="cover-section">
+          <h3 class="cover-section-title">Notes</h3>
+          <textarea class="cover-textarea" id="cover-notes" data-cover-field="notes" rows="4" placeholder="Context, key insights, or anything worth noting about this deal…"></textarea>
+        </section>
+        <section class="cover-section">
+          <h3 class="cover-section-title">Stage Progress</h3>
+          <div id="cover-stages-grid"></div>
+        </section>
+      </div>
+    </div>
   </div>
 
   <!-- Add Modal (prompts, steps, and new opportunity) -->

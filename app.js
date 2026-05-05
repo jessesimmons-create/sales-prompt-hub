@@ -13,6 +13,7 @@ const SK = {
     stepsAdded:   `sph_${id}_steps_added`,
     stepsRemoved: `sph_${id}_steps_removed`,
     comments:     `sph_${id}_comments`,
+    cover:        `sph_${id}_cover`,
   }),
 };
 
@@ -49,6 +50,7 @@ function loadOppState(id) {
     stepsAdded:        JSON.parse(localStorage.getItem(k.stepsAdded)   || '[]'),
     stepsRemoved: new Set(JSON.parse(localStorage.getItem(k.stepsRemoved) || '[]')),
     comments:          JSON.parse(localStorage.getItem(k.comments)     || '[]'),
+    cover:             JSON.parse(localStorage.getItem(k.cover)        || '{}'),
   };
 }
 
@@ -61,6 +63,7 @@ function saveCurrentOpp() {
   localStorage.setItem(k.stepsAdded,   JSON.stringify(state.stepsAdded));
   localStorage.setItem(k.stepsRemoved, JSON.stringify([...state.stepsRemoved]));
   localStorage.setItem(k.comments,     JSON.stringify(state.comments));
+  localStorage.setItem(k.cover,        JSON.stringify(state.cover));
 }
 
 // ── Role helpers ──────────────────────────────────────
@@ -126,6 +129,8 @@ function createOpp(name) {
   state.stepsAdded    = [];
   state.stepsRemoved  = new Set();
   state.comments      = [];
+  state.cover         = {};
+  state.activeStageId = '__cover__';
   localStorage.setItem(SK.activeOpp, id);
   saveCurrentOpp();
   state.oppDropdownOpen = false;
@@ -446,7 +451,15 @@ function renderCurrentUser() {
 // ── Render: Sidebar ───────────────────────────────────
 
 function renderSidebar() {
-  document.getElementById('stage-list').innerHTML = STAGES.map(s => {
+  const coverActive = state.activeStageId === '__cover__';
+  const coverItem = `
+    <div class="stage-item ${coverActive ? 'active' : ''}" style="--stage-color:#6366f1" data-stage="__cover__">
+      <div class="stage-item-row">
+        <span class="stage-icon">📄</span>
+        <span class="stage-name">Deal Overview</span>
+      </div>
+    </div>`;
+  document.getElementById('stage-list').innerHTML = coverItem + STAGES.map(s => {
     const { total, used } = stageStats(s);
     const { total: sTotal, used: sUsed } = stepStats(s);
     const stepsComplete = sTotal > 0 && sUsed === sTotal;
@@ -623,13 +636,55 @@ function renderSteps(stage) {
   document.getElementById('steps-grid').innerHTML = cards + addBtn;
 }
 
+// ── Render: Cover page ────────────────────────────────
+
+function renderCover() {
+  document.getElementById('stage-header').style.display  = 'none';
+  document.getElementById('prompts-area').style.display  = 'none';
+  document.getElementById('cover-view').style.display    = '';
+
+  const opp = state.opps.find(o => o.id === state.activeOppId);
+  document.getElementById('cover-opp-name').textContent = opp?.name || '—';
+
+  const c = state.cover;
+  document.getElementById('cover-company').value    = c.company   || '';
+  document.getElementById('cover-contact').value    = c.contact   || '';
+  document.getElementById('cover-deal-value').value = c.dealValue || '';
+  document.getElementById('cover-close-date').value = c.closeDate || '';
+  document.getElementById('cover-notes').value      = c.notes     || '';
+
+  document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
+    const { total: sTotal, used: sUsed } = stepStats(s);
+    const { total: pTotal, used: pUsed } = stageStats(s);
+    const pct = sTotal ? Math.round((sUsed / sTotal) * 100) : 0;
+    return `
+      <div class="cover-stage-card" data-nav-stage="${s.id}" style="--stage-color:${s.color}">
+        <div class="cover-stage-header">
+          <span class="cover-stage-icon">${s.icon}</span>
+          <span class="cover-stage-name">${escHtml(s.name)}</span>
+        </div>
+        <div class="cover-stage-stats">${sUsed}/${sTotal} steps &middot; ${pUsed}/${pTotal} prompts</div>
+        <div class="cover-stage-bar-track">
+          <div class="cover-stage-bar-fill" style="width:${pct}%;background:${s.color}"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 // ── Full render ───────────────────────────────────────
 
 function render() {
-  const stage = STAGES.find(s => s.id === state.activeStageId);
   renderOppSelector();
   renderCurrentUser();
   renderSidebar();
+  if (state.activeStageId === '__cover__') {
+    renderCover();
+    return;
+  }
+  document.getElementById('stage-header').style.display = '';
+  document.getElementById('prompts-area').style.display = '';
+  document.getElementById('cover-view').style.display   = 'none';
+  const stage = STAGES.find(s => s.id === state.activeStageId);
   renderHeader(stage);
   renderTabs(stage);
   if (state.activeCondId === '__steps__') renderSteps(stage);
@@ -806,7 +861,13 @@ document.addEventListener('click', e => {
 document.getElementById('stage-list').addEventListener('click', e => {
   const item = e.target.closest('.stage-item');
   if (!item) return;
-  const stage = STAGES.find(s => s.id === item.dataset.stage);
+  const stageId = item.dataset.stage;
+  if (stageId === '__cover__') {
+    state.activeStageId = '__cover__';
+    render();
+    return;
+  }
+  const stage = STAGES.find(s => s.id === stageId);
   state.activeStageId = stage.id;
   state.activeCondId  = stage.conditions[0].id;
   render();
@@ -877,6 +938,25 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
   state.used.clear();
   state.stepsUsed.clear();
   saveCurrentOpp();
+  render();
+});
+
+// Cover view — save fields on input, navigate stage cards on click
+document.getElementById('cover-view').addEventListener('input', e => {
+  const field = e.target.dataset.coverField;
+  if (!field) return;
+  if (!state.cover) state.cover = {};
+  state.cover[field] = e.target.value;
+  saveCurrentOpp();
+});
+
+document.getElementById('cover-stages-grid').addEventListener('click', e => {
+  const card = e.target.closest('[data-nav-stage]');
+  if (!card) return;
+  const stage = STAGES.find(s => s.id === card.dataset.navStage);
+  if (!stage) return;
+  state.activeStageId = stage.id;
+  state.activeCondId  = stage.conditions[0].id;
   render();
 });
 

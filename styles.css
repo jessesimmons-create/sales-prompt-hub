@@ -1295,6 +1295,176 @@ body {
 
 #users-add-error.hidden { display: none; }
 
+/* ── Cover page ───────────────────────────────────────── */
+
+#cover-view {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#cover-hero {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  padding: 36px 40px 32px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+#cover-hero-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#cover-opp-icon {
+  font-size: 38px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+  flex-shrink: 0;
+}
+
+#cover-opp-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+#cover-body {
+  flex: 1;
+  padding: 28px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 900px;
+}
+
+.cover-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.cover-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.cover-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cover-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.cover-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cover-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.cover-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  resize: vertical;
+  line-height: 1.6;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cover-textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+#cover-stages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.cover-stage-card {
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cover-stage-card:hover {
+  border-color: var(--stage-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.cover-stage-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cover-stage-icon { font-size: 16px; line-height: 1; }
+
+.cover-stage-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cover-stage-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cover-stage-bar-track {
+  height: 4px;
+  background: #f1f5f9;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.cover-stage-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 @keyframes slideUp {
