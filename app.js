@@ -118,7 +118,7 @@ function switchOpp(id) {
 function createOpp(name) {
   saveCurrentOpp();
   const id  = 'opp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5);
-  const opp = { id, name: name.trim(), createdAt: Date.now() };
+  const opp = { id, name: name.trim(), createdAt: Date.now(), createdBy: state.currentEmail };
   state.opps.push(opp);
   localStorage.setItem(SK.opps, JSON.stringify(state.opps));
   state.activeOppId   = id;
@@ -138,16 +138,18 @@ function createOpp(name) {
 }
 
 function deleteOpp(id) {
-  if (state.opps.length <= 1) return;
+  if (visibleOpps().length <= 1) return;
   const k = SK.opp(id);
   Object.values(k).forEach(key => localStorage.removeItem(key));
   state.opps = state.opps.filter(o => o.id !== id);
   localStorage.setItem(SK.opps, JSON.stringify(state.opps));
   if (state.activeOppId === id) {
-    const next = state.opps[0];
-    state.activeOppId = next.id;
-    Object.assign(state, loadOppState(next.id));
-    localStorage.setItem(SK.activeOpp, next.id);
+    const next = visibleOpps()[0];
+    if (next) {
+      state.activeOppId = next.id;
+      Object.assign(state, loadOppState(next.id));
+      localStorage.setItem(SK.activeOpp, next.id);
+    }
   }
   render();
 }
@@ -372,6 +374,45 @@ function stepStats(stage) {
   return { total: steps.length, used: steps.filter(s => state.stepsUsed.has(s.id)).length };
 }
 
+// ── Visibility helpers ────────────────────────────────
+
+function visibleOpps() {
+  if (state.role === 'admin') return state.opps;
+  return state.opps.filter(o => o.createdBy === state.currentEmail);
+}
+
+function ensureValidActiveOpp() {
+  const visible = visibleOpps();
+  if (visible.find(o => o.id === state.activeOppId)) return;
+
+  if (visible.length > 0) {
+    saveCurrentOpp();
+    const next = visible[0];
+    state.activeOppId = next.id;
+    Object.assign(state, loadOppState(next.id));
+    localStorage.setItem(SK.activeOpp, next.id);
+  } else {
+    // No visible opps for this user — create one automatically
+    saveCurrentOpp();
+    const id  = 'opp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5);
+    const opp = { id, name: 'My First Deal', createdAt: Date.now(), createdBy: state.currentEmail };
+    state.opps.push(opp);
+    localStorage.setItem(SK.opps, JSON.stringify(state.opps));
+    state.activeOppId   = id;
+    state.used          = new Set();
+    state.added         = [];
+    state.removed       = new Set();
+    state.stepsUsed     = new Set();
+    state.stepsAdded    = [];
+    state.stepsRemoved  = new Set();
+    state.comments      = [];
+    state.cover         = { opportunityOwner: state.currentEmail };
+    state.activeStageId = '__cover__';
+    localStorage.setItem(SK.activeOpp, id);
+    saveCurrentOpp();
+  }
+}
+
 // ── Render: Opportunity selector ──────────────────────
 
 function renderOppSelector() {
@@ -384,7 +425,8 @@ function renderOppSelector() {
   if (state.oppDropdownOpen) {
     selector.classList.add('open');
     dropdown.classList.remove('hidden');
-    const canDelete = state.opps.length > 1;
+    const myOpps    = visibleOpps();
+    const canDelete = myOpps.length > 1;
     dropdown.innerHTML =
       `<div class="opp-search-wrap">
          <svg class="opp-search-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -393,7 +435,7 @@ function renderOppSelector() {
          </svg>
          <input class="opp-search-input" type="text" placeholder="Search deals…" autocomplete="off" />
        </div>` +
-      state.opps.map(o => `
+      myOpps.map(o => `
         <div class="opp-item ${o.id === state.activeOppId ? 'active' : ''}" data-opp-id="${o.id}">
           <svg class="opp-check-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 6L5 9L10 3" stroke="#22c55e" stroke-width="1.8"
@@ -684,6 +726,7 @@ function renderCover() {
 // ── Full render ───────────────────────────────────────
 
 function render() {
+  ensureValidActiveOpp();
   renderOppSelector();
   renderCurrentUser();
   renderSidebar();
