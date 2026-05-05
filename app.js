@@ -381,6 +381,13 @@ function renderOppSelector() {
     dropdown.classList.remove('hidden');
     const canDelete = state.opps.length > 1;
     dropdown.innerHTML =
+      `<div class="opp-search-wrap">
+         <svg class="opp-search-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+           <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.4"/>
+           <path d="M8 8l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+         </svg>
+         <input class="opp-search-input" type="text" placeholder="Search deals…" autocomplete="off" />
+       </div>` +
       state.opps.map(o => `
         <div class="opp-item ${o.id === state.activeOppId ? 'active' : ''}" data-opp-id="${o.id}">
           <svg class="opp-check-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -404,6 +411,21 @@ function renderOppSelector() {
          </svg>
          New Opportunity
        </button>`;
+
+    const searchInput = dropdown.querySelector('.opp-search-input');
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase();
+      dropdown.querySelectorAll('.opp-item').forEach(item => {
+        const name = item.querySelector('.opp-item-name').textContent.toLowerCase();
+        item.style.display = name.includes(q) ? '' : 'none';
+      });
+    });
+    searchInput.addEventListener('click', e => e.stopPropagation());
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { state.oppDropdownOpen = false; renderOppSelector(); }
+      e.stopPropagation();
+    });
+    searchInput.focus();
   } else {
     selector.classList.remove('open');
     dropdown.classList.add('hidden');

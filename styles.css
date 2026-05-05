@@ -159,6 +159,29 @@ body {
 .opp-item:hover .opp-delete-btn { opacity: 1; }
 .opp-delete-btn:hover { background: rgba(239,68,68,0.15); color: #f87171; }
 
+.opp-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.opp-search-icon { flex-shrink: 0; color: #475569; }
+
+.opp-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: #e2e8f0;
+  min-width: 0;
+}
+
+.opp-search-input::placeholder { color: #475569; }
+
 .opp-dropdown-divider {
   height: 1px;
   background: rgba(255,255,255,0.07);
