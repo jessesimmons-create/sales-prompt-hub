@@ -707,16 +707,16 @@ function openDeleteModal(type, id) {
       if (found) { title = found.title; break; }
     }
     document.getElementById('delete-title').textContent = 'Remove step?';
-    document.getElementById('delete-desc').textContent  =
-      `"${title}" will be permanently removed from this stage.`;
+    document.getElementById('delete-desc').innerHTML  =
+      `"${escHtml(title)}" will be permanently removed from this stage for <strong>all users</strong>.`;
   } else {
     for (const s of STAGES) for (const c of s.conditions) {
       const found = effectivePrompts(c).find(x => x.id === id);
       if (found) { title = found.title; break; }
     }
     document.getElementById('delete-title').textContent = 'Remove prompt?';
-    document.getElementById('delete-desc').textContent  =
-      `"${title}" will be permanently removed from this condition.`;
+    document.getElementById('delete-desc').innerHTML  =
+      `"${escHtml(title)}" will be permanently removed from this condition for <strong>all users</strong>.`;
   }
 
   document.getElementById('delete-overlay').classList.remove('hidden');
