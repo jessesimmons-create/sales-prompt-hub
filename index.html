@@ -91,6 +91,10 @@
         <section class="cover-section">
           <h3 class="cover-section-title">Deal Details</h3>
           <div class="cover-fields-grid">
+            <div class="cover-field cover-field-full">
+              <label class="cover-label">Opportunity Owner</label>
+              <input class="cover-input" id="cover-opp-owner" data-cover-field="opportunityOwner" type="text" placeholder="e.g. jane@company.com" autocomplete="off" />
+            </div>
             <div class="cover-field">
               <label class="cover-label">Company</label>
               <input class="cover-input" id="cover-company" data-cover-field="company" type="text" placeholder="e.g. Acme Corp" autocomplete="off" />
@@ -106,6 +110,18 @@
             <div class="cover-field">
               <label class="cover-label">Expected Close</label>
               <input class="cover-input" id="cover-close-date" data-cover-field="closeDate" type="text" placeholder="e.g. Q3 2026" autocomplete="off" />
+            </div>
+            <div class="cover-field">
+              <label class="cover-label">Sales Engineer</label>
+              <select class="cover-select" id="cover-sales-engineer" data-cover-field="salesEngineer">
+                <option value="">— None —</option>
+              </select>
+            </div>
+            <div class="cover-field">
+              <label class="cover-label">Additional Resource</label>
+              <select class="cover-select" id="cover-additional-resource" data-cover-field="additionalResource">
+                <option value="">— None —</option>
+              </select>
             </div>
           </div>
         </section>

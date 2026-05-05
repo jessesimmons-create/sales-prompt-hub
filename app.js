@@ -129,7 +129,7 @@ function createOpp(name) {
   state.stepsAdded    = [];
   state.stepsRemoved  = new Set();
   state.comments      = [];
-  state.cover         = {};
+  state.cover         = { opportunityOwner: state.currentEmail };
   state.activeStageId = '__cover__';
   localStorage.setItem(SK.activeOpp, id);
   saveCurrentOpp();
@@ -647,11 +647,21 @@ function renderCover() {
   document.getElementById('cover-opp-name').textContent = opp?.name || '—';
 
   const c = state.cover;
-  document.getElementById('cover-company').value    = c.company   || '';
-  document.getElementById('cover-contact').value    = c.contact   || '';
-  document.getElementById('cover-deal-value').value = c.dealValue || '';
-  document.getElementById('cover-close-date').value = c.closeDate || '';
-  document.getElementById('cover-notes').value      = c.notes     || '';
+  document.getElementById('cover-opp-owner').value  = c.opportunityOwner || '';
+  document.getElementById('cover-company').value    = c.company          || '';
+  document.getElementById('cover-contact').value    = c.contact          || '';
+  document.getElementById('cover-deal-value').value = c.dealValue        || '';
+  document.getElementById('cover-close-date').value = c.closeDate        || '';
+  document.getElementById('cover-notes').value      = c.notes            || '';
+
+  const userOpts = '<option value="">— None —</option>' +
+    state.users.map(u =>
+      `<option value="${escHtml(u.email)}">${escHtml(u.email)}</option>`
+    ).join('');
+  document.getElementById('cover-sales-engineer').innerHTML      = userOpts;
+  document.getElementById('cover-additional-resource').innerHTML = userOpts;
+  document.getElementById('cover-sales-engineer').value      = c.salesEngineer      || '';
+  document.getElementById('cover-additional-resource').value = c.additionalResource || '';
 
   document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
     const { total: sTotal, used: sUsed } = stepStats(s);
@@ -941,13 +951,15 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
   render();
 });
 
-// Cover view — save fields on input, navigate stage cards on click
-document.getElementById('cover-view').addEventListener('input', e => {
-  const field = e.target.dataset.coverField;
-  if (!field) return;
-  if (!state.cover) state.cover = {};
-  state.cover[field] = e.target.value;
-  saveCurrentOpp();
+// Cover view — save fields on input/change, navigate stage cards on click
+['input', 'change'].forEach(evt => {
+  document.getElementById('cover-view').addEventListener(evt, e => {
+    const field = e.target.dataset.coverField;
+    if (!field) return;
+    if (!state.cover) state.cover = {};
+    state.cover[field] = e.target.value;
+    saveCurrentOpp();
+  });
 });
 
 document.getElementById('cover-stages-grid').addEventListener('click', e => {
