@@ -247,7 +247,45 @@ body {
 #sidebar-footer {
   padding: 14px 18px;
   border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
+
+#role-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: #94a3b8;
+}
+
+#role-toggle:hover {
+  background: rgba(255,255,255,0.09);
+  color: #cbd5e1;
+}
+
+#role-toggle.is-admin {
+  border-color: rgba(99,102,241,0.4);
+  background: rgba(99,102,241,0.12);
+  color: #a5b4fc;
+}
+
+#role-toggle.is-admin:hover {
+  background: rgba(99,102,241,0.18);
+}
+
+#role-icon { font-size: 12px; }
 
 #reset-all-btn {
   width: 100%;

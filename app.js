@@ -3,6 +3,7 @@
 const SK = {
   opps:      'sph_opps',
   activeOpp: 'sph_active_opp',
+  role:      'sph_role',
   opp: id => ({
     used:         `sph_${id}_used`,
     added:        `sph_${id}_added`,
@@ -78,6 +79,7 @@ const state = {
   activeStageId:   STAGES[0].id,
   activeCondId:    STAGES[0].conditions[0].id,
   oppDropdownOpen: false,
+  role:            localStorage.getItem(SK.role) || 'admin',
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -197,6 +199,15 @@ function renderOppSelector() {
   }
 }
 
+// ── Render: Role toggle ───────────────────────────────
+
+function renderRoleToggle() {
+  const isAdmin = state.role === 'admin';
+  document.getElementById('role-icon').textContent  = isAdmin ? '🔓' : '🔒';
+  document.getElementById('role-label').textContent = isAdmin ? 'Admin' : 'Standard User';
+  document.getElementById('role-toggle').classList.toggle('is-admin', isAdmin);
+}
+
 // ── Render: Sidebar ───────────────────────────────────
 
 function renderSidebar() {
@@ -295,22 +306,24 @@ function renderPrompts(stage) {
         </div>
         <div class="prompt-body ${bodyClass}">${escHtml(bodyText)}</div>
         <span class="used-pill">✓ Used</span>
+        ${state.role === 'admin' ? `
         <button class="prompt-delete-btn" data-delete-prompt="${p.id}" title="Remove prompt">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
                   stroke-linecap="round"/>
           </svg>
-        </button>
+        </button>` : ''}
       </div>`;
   }).join('');
 
-  document.getElementById('prompts-grid').innerHTML = cards + `
+  const addBtn = state.role === 'admin' ? `
     <button class="add-prompt-btn" data-add-prompt="${cond.id}" style="--add-color:${stage.color}">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Add Prompt
-    </button>`;
+    </button>` : '';
+  document.getElementById('prompts-grid').innerHTML = cards + addBtn;
 }
 
 // ── Render: Steps ─────────────────────────────────────
@@ -345,22 +358,24 @@ function renderSteps(stage) {
           <span class="prompt-title">${escHtml(s.title)}</span>
         </div>
         <span class="used-pill">✓ Done</span>
+        ${state.role === 'admin' ? `
         <button class="prompt-delete-btn" data-delete-step="${s.id}" title="Remove step">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
                   stroke-linecap="round"/>
           </svg>
-        </button>
+        </button>` : ''}
       </div>`;
   }).join('');
 
-  document.getElementById('steps-grid').innerHTML = cards + `
+  const addBtn = state.role === 'admin' ? `
     <button class="add-prompt-btn" data-add-step="${stage.id}" style="--add-color:${stage.color}">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Add Step
-    </button>`;
+    </button>` : '';
+  document.getElementById('steps-grid').innerHTML = cards + addBtn;
 }
 
 // ── Full render ───────────────────────────────────────
@@ -368,6 +383,7 @@ function renderSteps(stage) {
 function render() {
   const stage = STAGES.find(s => s.id === state.activeStageId);
   renderOppSelector();
+  renderRoleToggle();
   renderSidebar();
   renderHeader(stage);
   renderTabs(stage);
@@ -597,6 +613,12 @@ document.getElementById('reset-stage-btn').addEventListener('click', () => {
   stage.conditions.forEach(c => effectivePrompts(c).forEach(p => state.used.delete(p.id)));
   effectiveSteps(stage).forEach(s => state.stepsUsed.delete(s.id));
   saveCurrentOpp();
+  render();
+});
+
+document.getElementById('role-toggle').addEventListener('click', () => {
+  state.role = state.role === 'admin' ? 'standard' : 'admin';
+  localStorage.setItem(SK.role, state.role);
   render();
 });
 
