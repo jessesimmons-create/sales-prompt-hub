@@ -67,6 +67,7 @@ function saveCurrentOpp() {
 
 function determineRole(email, users) {
   if (!email) return 'standard';
+  if (email.toLowerCase() === 'ccadmin') return 'admin';
   if (users.length === 0) return 'admin';
   const u = users.find(u => u.email === email.toLowerCase());
   return u ? u.role : 'standard';
@@ -189,9 +190,19 @@ function hideEmailGate() {
 
 function submitEmailGate() {
   const raw   = document.getElementById('email-gate-input').value.trim();
+  const errEl = document.getElementById('email-gate-error');
+
+  if (raw.toLowerCase() === 'ccadmin') {
+    state.currentEmail = 'CCAdmin';
+    state.role = 'admin';
+    localStorage.setItem(SK.currentEmail, 'CCAdmin');
+    hideEmailGate();
+    render();
+    return;
+  }
+
   const email = raw.toLowerCase();
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const errEl = document.getElementById('email-gate-error');
   if (!valid) { errEl.classList.remove('hidden'); document.getElementById('email-gate-input').focus(); return; }
   errEl.classList.add('hidden');
 
