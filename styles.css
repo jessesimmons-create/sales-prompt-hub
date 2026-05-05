@@ -252,40 +252,162 @@ body {
   gap: 6px;
 }
 
-#role-toggle {
-  width: 100%;
+/* ── Email gate ───────────────────────────────────────── */
+
+#email-gate {
+  position: fixed;
+  inset: 0;
+  background: #0f172a;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  font-size: 11px;
+  justify-content: center;
+  z-index: 1000;
+}
+
+#email-gate.hidden { display: none; }
+
+#email-gate-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 40px 36px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+#email-gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+#email-gate-brand-icon { font-size: 20px; }
+
+#email-gate-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+#email-gate-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+#email-gate-input {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: #f8fafc;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  margin-bottom: 6px;
+}
+
+#email-gate-input:focus {
+  border-color: #6366f1;
+  background: #fff;
+}
+
+#email-gate-error {
+  font-size: 12px;
+  color: #ef4444;
+  margin-bottom: 14px;
+}
+
+#email-gate-error.hidden { display: none; }
+
+#email-gate-btn {
+  width: 100%;
+  padding: 11px;
+  font-size: 14px;
   font-weight: 600;
   font-family: inherit;
-  border-radius: 6px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.15s;
-  letter-spacing: 0.02em;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.05);
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+
+#email-gate-btn:hover { background: #4f46e5; }
+
+/* ── Current user (sidebar footer) ───────────────────── */
+
+#current-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+
+#current-user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+#current-user-email {
+  font-size: 11px;
+  font-weight: 500;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-#role-toggle:hover {
-  background: rgba(255,255,255,0.09);
-  color: #cbd5e1;
+.role-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #475569;
+  text-transform: uppercase;
 }
 
-#role-toggle.is-admin {
-  border-color: rgba(99,102,241,0.4);
-  background: rgba(99,102,241,0.12);
-  color: #a5b4fc;
+.role-badge.is-admin { color: #818cf8; }
+
+#sign-out-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
 }
 
-#role-toggle.is-admin:hover {
-  background: rgba(99,102,241,0.18);
+#sign-out-btn:hover {
+  background: rgba(239,68,68,0.12);
+  color: #f87171;
 }
-
-#role-icon { font-size: 12px; }
 
 #manage-users-btn {
   width: 100%;
@@ -1034,6 +1156,34 @@ body {
 .user-role-btn.standard:hover {
   background: #e2e8f0;
 }
+
+.you-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6366f1;
+  background: rgba(99,102,241,0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+.user-invite-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #94a3b8;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.user-invite-btn:hover { background: #eff6ff; color: #3b82f6; }
 
 .user-remove-btn {
   width: 24px;

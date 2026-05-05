@@ -1,10 +1,10 @@
 // ── Storage ───────────────────────────────────────────
 
 const SK = {
-  opps:      'sph_opps',
-  activeOpp: 'sph_active_opp',
-  role:      'sph_role',
-  users:     'sph_users',
+  opps:         'sph_opps',
+  activeOpp:    'sph_active_opp',
+  currentEmail: 'sph_current_email',
+  users:        'sph_users',
   opp: id => ({
     used:         `sph_${id}_used`,
     added:        `sph_${id}_added`,
@@ -63,6 +63,15 @@ function saveCurrentOpp() {
   localStorage.setItem(k.comments,     JSON.stringify(state.comments));
 }
 
+// ── Role helpers ──────────────────────────────────────
+
+function determineRole(email, users) {
+  if (!email) return 'standard';
+  if (users.length === 0) return 'admin';
+  const u = users.find(u => u.email === email.toLowerCase());
+  return u ? u.role : 'standard';
+}
+
 // ── State init ────────────────────────────────────────
 
 let opps = JSON.parse(localStorage.getItem(SK.opps) || '[]');
@@ -76,15 +85,19 @@ if (opps.length === 0) {
 const savedActiveId = localStorage.getItem(SK.activeOpp);
 const initialOppId  = opps.find(o => o.id === savedActiveId) ? savedActiveId : opps[0].id;
 
+const storedUsers = JSON.parse(localStorage.getItem(SK.users) || '[]');
+const storedEmail = localStorage.getItem(SK.currentEmail) || '';
+
 const state = {
   opps,
-  activeOppId: initialOppId,
+  activeOppId:     initialOppId,
   ...loadOppState(initialOppId),
   activeStageId:   STAGES[0].id,
   activeCondId:    STAGES[0].conditions[0].id,
   oppDropdownOpen: false,
-  role:            localStorage.getItem(SK.role) || 'admin',
-  users:           JSON.parse(localStorage.getItem(SK.users) || '[]'),
+  users:           storedUsers,
+  currentEmail:    storedEmail,
+  role:            determineRole(storedEmail, storedUsers),
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -149,11 +162,60 @@ function addUser(email, role) {
 function removeUser(email) {
   state.users = state.users.filter(u => u.email !== email);
   saveUsers();
+  if (state.currentEmail === email) signOut();
 }
 
 function toggleUserRole(email) {
   const user = state.users.find(u => u.email === email);
-  if (user) { user.role = user.role === 'admin' ? 'standard' : 'admin'; saveUsers(); }
+  if (!user) return;
+  user.role = user.role === 'admin' ? 'standard' : 'admin';
+  saveUsers();
+  if (state.currentEmail === email) {
+    state.role = user.role;
+    render();
+  }
+}
+
+// ── Email gate ────────────────────────────────────────
+
+function showEmailGate() {
+  document.getElementById('email-gate').classList.remove('hidden');
+  document.getElementById('email-gate-input').focus();
+}
+
+function hideEmailGate() {
+  document.getElementById('email-gate').classList.add('hidden');
+}
+
+function submitEmailGate() {
+  const raw   = document.getElementById('email-gate-input').value.trim();
+  const email = raw.toLowerCase();
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const errEl = document.getElementById('email-gate-error');
+  if (!valid) { errEl.classList.remove('hidden'); document.getElementById('email-gate-input').focus(); return; }
+  errEl.classList.add('hidden');
+
+  if (!state.users.find(u => u.email === email)) {
+    const role = state.users.length === 0 ? 'admin' : 'standard';
+    state.users.push({ email, role });
+    saveUsers();
+  }
+
+  state.currentEmail = email;
+  state.role = determineRole(email, state.users);
+  localStorage.setItem(SK.currentEmail, email);
+  hideEmailGate();
+  render();
+}
+
+function signOut() {
+  state.currentEmail = '';
+  state.role = 'standard';
+  localStorage.removeItem(SK.currentEmail);
+  document.getElementById('email-gate-input').value = '';
+  document.getElementById('email-gate-error').classList.add('hidden');
+  render();
+  showEmailGate();
 }
 
 function openUsersModal() {
@@ -176,18 +238,31 @@ function renderUsersModal() {
     list.innerHTML = '<p id="users-empty">No users added yet.</p>';
     return;
   }
-  list.innerHTML = state.users.map(u => `
-    <div class="user-row">
-      <span class="user-email">${escHtml(u.email)}</span>
+  const appUrl = window.location.origin + window.location.pathname;
+  list.innerHTML = state.users.map(u => {
+    const subj = encodeURIComponent('You\'ve been invited to Sales Prompt Hub');
+    const body = encodeURIComponent(
+      `Hi,\n\nYou've been invited to use Sales Prompt Hub.\n\nVisit: ${appUrl}\n\nWhen prompted, enter your email address (${u.email}) to access the app.\n\nYour access level: ${u.role === 'admin' ? 'Admin' : 'Standard User'}\n\nThanks!`
+    );
+    const isSelf = state.currentEmail === u.email;
+    return `
+    <div class="user-row ${isSelf ? 'is-self' : ''}">
+      <span class="user-email">${escHtml(u.email)}${isSelf ? ' <span class="you-badge">you</span>' : ''}</span>
       <button class="user-role-btn ${u.role}" data-toggle-role="${escHtml(u.email)}">
         ${u.role === 'admin' ? 'Admin' : 'Standard'}
       </button>
+      <a class="user-invite-btn" href="mailto:${escHtml(u.email)}?subject=${subj}&body=${body}" title="Send invite email">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <rect x="1" y="2.5" width="10" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M1 4l5 3.5L11 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </a>
       <button class="user-remove-btn" data-remove-user="${escHtml(u.email)}" title="Remove user">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
-    </div>`).join('');
+    </div>`; }).join('');
 }
 
 // ── Comments ──────────────────────────────────────────
@@ -324,13 +399,14 @@ function renderOppSelector() {
   }
 }
 
-// ── Render: Role toggle ───────────────────────────────
+// ── Render: Current user ──────────────────────────────
 
-function renderRoleToggle() {
+function renderCurrentUser() {
   const isAdmin = state.role === 'admin';
-  document.getElementById('role-icon').textContent  = isAdmin ? '🔓' : '🔒';
-  document.getElementById('role-label').textContent = isAdmin ? 'Admin' : 'Standard User';
-  document.getElementById('role-toggle').classList.toggle('is-admin', isAdmin);
+  document.getElementById('current-user-email').textContent = state.currentEmail || '—';
+  const badge = document.getElementById('current-user-role-badge');
+  badge.textContent  = isAdmin ? 'Admin' : 'Standard';
+  badge.className    = 'role-badge ' + (isAdmin ? 'is-admin' : '');
   document.getElementById('manage-users-btn').classList.toggle('hidden', !isAdmin);
 }
 
@@ -519,7 +595,7 @@ function renderSteps(stage) {
 function render() {
   const stage = STAGES.find(s => s.id === state.activeStageId);
   renderOppSelector();
-  renderRoleToggle();
+  renderCurrentUser();
   renderSidebar();
   renderHeader(stage);
   renderTabs(stage);
@@ -755,10 +831,12 @@ document.getElementById('reset-stage-btn').addEventListener('click', () => {
   render();
 });
 
-document.getElementById('role-toggle').addEventListener('click', () => {
-  state.role = state.role === 'admin' ? 'standard' : 'admin';
-  localStorage.setItem(SK.role, state.role);
-  render();
+document.getElementById('sign-out-btn').addEventListener('click', signOut);
+
+document.getElementById('email-gate-btn').addEventListener('click', submitEmailGate);
+document.getElementById('email-gate-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitEmailGate();
+  else document.getElementById('email-gate-error').classList.add('hidden');
 });
 
 document.getElementById('reset-all-btn').addEventListener('click', () => {
@@ -927,3 +1005,4 @@ function escHtml(str) {
 // ── Init ──────────────────────────────────────────────
 
 render();
+if (!state.currentEmail) showEmailGate();
