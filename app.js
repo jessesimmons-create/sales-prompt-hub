@@ -943,6 +943,49 @@ function renderSteps(stage) {
   document.getElementById('steps-grid').innerHTML = nudge + cards + addBtn;
 }
 
+// ── Searchable select (cover page) ───────────────────
+
+let openSearchSelect = null; // 'salesEngineer' | 'additionalResource' | null
+
+function renderSearchableSelect(containerId, field, options, currentValue) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const current = options.find(o => o.value === currentValue);
+  const displayVal = current ? current.label : '— None —';
+  const isOpen = openSearchSelect === field;
+  el.innerHTML = `
+    <button class="css-trigger ${isOpen ? 'open' : ''}" type="button" data-css-toggle="${field}">
+      <span class="css-value ${!current ? 'css-placeholder' : ''}">${escHtml(displayVal)}</span>
+      <svg class="css-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div class="css-dropdown ${isOpen ? '' : 'hidden'}" data-css-field="${field}">
+      <div class="css-search-wrap">
+        <svg class="css-search-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 8l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input class="css-search" type="text" placeholder="Search…" autocomplete="off" />
+      </div>
+      <div class="css-options">
+        ${options.map(o => `
+          <div class="css-option ${o.value === currentValue ? 'selected' : ''}"
+               data-css-value="${escHtml(o.value)}" data-css-field="${field}">
+            ${escHtml(o.label)}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  if (isOpen) {
+    setTimeout(() => el.querySelector('.css-search')?.focus(), 0);
+  }
+}
+
+function closeSearchSelects() {
+  openSearchSelect = null;
+}
+
 // ── Render: Cover page ────────────────────────────────
 
 function renderCover() {
@@ -963,14 +1006,12 @@ function renderCover() {
   document.getElementById('cover-close-date').value = c.closeDate        || '';
   document.getElementById('cover-notes').value      = c.notes            || '';
 
-  const userOpts = '<option value="">— None —</option>' +
-    state.users.map(u =>
-      `<option value="${escHtml(u.email)}">${escHtml(u.email)}</option>`
-    ).join('');
-  document.getElementById('cover-sales-engineer').innerHTML      = userOpts;
-  document.getElementById('cover-additional-resource').innerHTML = userOpts;
-  document.getElementById('cover-sales-engineer').value      = c.salesEngineer      || '';
-  document.getElementById('cover-additional-resource').value = c.additionalResource || '';
+  const userOptions = [
+    { value: '', label: '— None —' },
+    ...state.users.map(u => ({ value: u.email, label: u.email })),
+  ];
+  renderSearchableSelect('cover-sales-engineer',      'salesEngineer',      userOptions, c.salesEngineer      || '');
+  renderSearchableSelect('cover-additional-resource', 'additionalResource', userOptions, c.additionalResource || '');
 
   document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
     const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(s);
@@ -1180,6 +1221,7 @@ document.getElementById('stage-list').addEventListener('click', e => {
   const item = e.target.closest('.stage-item');
   if (!item) return;
   pendingWeightChange = null;
+  closeSearchSelects();
   const stageId = item.dataset.stage;
   if (stageId === '__cover__') {
     state.activeStageId = '__cover__';
@@ -1310,12 +1352,49 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
 // Cover view — save fields on input/change, navigate stage cards on click
 ['input', 'change'].forEach(evt => {
   document.getElementById('cover-view').addEventListener(evt, e => {
+    // Searchable select search input — filter options in-place
+    if (e.target.classList.contains('css-search')) {
+      const q = e.target.value.toLowerCase();
+      e.target.closest('.css-dropdown')
+        ?.querySelectorAll('.css-option')
+        .forEach(opt => {
+          opt.style.display = opt.textContent.trim().toLowerCase().includes(q) ? '' : 'none';
+        });
+      return;
+    }
     const field = e.target.dataset.coverField;
     if (!field) return;
     if (!state.cover) state.cover = {};
     state.cover[field] = e.target.value;
     saveCurrentOpp();
   });
+});
+
+// Searchable select — toggle open/close and option selection
+document.getElementById('cover-view').addEventListener('click', e => {
+  const option = e.target.closest('.css-option');
+  if (option) {
+    const field = option.dataset.cssField;
+    const value = option.dataset.cssValue;
+    if (!state.cover) state.cover = {};
+    state.cover[field] = value;
+    saveCurrentOpp();
+    closeSearchSelects();
+    renderCover();
+    return;
+  }
+  const trigger = e.target.closest('[data-css-toggle]');
+  if (trigger) {
+    const field = trigger.dataset.cssToggle;
+    openSearchSelect = openSearchSelect === field ? null : field;
+    renderCover();
+    return;
+  }
+  // Click outside any open dropdown → close
+  if (openSearchSelect && !e.target.closest('.cover-searchable-select')) {
+    closeSearchSelects();
+    renderCover();
+  }
 });
 
 document.getElementById('cover-delete-btn').addEventListener('click', () => {
@@ -1425,6 +1504,7 @@ document.getElementById('users-list').addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (openSearchSelect) { closeSearchSelects(); renderCover(); return; }
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
   if (!document.getElementById('prompt-edit-overlay').classList.contains('hidden'))  { closePromptEditModal(); return; }
   if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }
