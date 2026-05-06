@@ -945,30 +945,28 @@ function renderSteps(stage) {
 
 // ── Searchable select (cover page) ───────────────────
 
-let openSearchSelect = null; // 'salesEngineer' | 'additionalResource' | null
-
 function renderSearchableSelect(containerId, field, options, currentValue) {
   const el = document.getElementById(containerId);
   if (!el) return;
   const current = options.find(o => o.value === currentValue);
-  const displayVal = current ? current.label : '— None —';
-  const isOpen = openSearchSelect === field;
+  // Show the label in the input; empty string means placeholder will show
+  const displayVal = (current && current.value !== '') ? current.label : '';
   el.innerHTML = `
-    <button class="css-trigger ${isOpen ? 'open' : ''}" type="button" data-css-toggle="${field}">
-      <span class="css-value ${!current ? 'css-placeholder' : ''}">${escHtml(displayVal)}</span>
+    <div class="css-wrap">
+      <input class="css-input"
+             type="text"
+             value="${escHtml(displayVal)}"
+             placeholder="— None —"
+             autocomplete="off"
+             spellcheck="false"
+             data-css-field="${field}"
+             data-css-selected="${escHtml(currentValue)}" />
       <svg class="css-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
         <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5"
               stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-    </button>
-    <div class="css-dropdown ${isOpen ? '' : 'hidden'}" data-css-field="${field}">
-      <div class="css-search-wrap">
-        <svg class="css-search-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M8 8l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        <input class="css-search" type="text" placeholder="Search…" autocomplete="off" />
-      </div>
+    </div>
+    <div class="css-dropdown hidden">
       <div class="css-options">
         ${options.map(o => `
           <div class="css-option ${o.value === currentValue ? 'selected' : ''}"
@@ -977,13 +975,22 @@ function renderSearchableSelect(containerId, field, options, currentValue) {
           </div>`).join('')}
       </div>
     </div>`;
-  if (isOpen) {
-    setTimeout(() => el.querySelector('.css-search')?.focus(), 0);
-  }
 }
 
 function closeSearchSelects() {
-  openSearchSelect = null;
+  // Close any open dropdown by restoring the input value and hiding the list
+  document.querySelectorAll('.css-input').forEach(input => {
+    const container = input.closest('.cover-searchable-select');
+    const dropdown  = container?.querySelector('.css-dropdown');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+      dropdown.classList.add('hidden');
+      const saved = input.dataset.cssSelected;
+      const opts  = [...(container?.querySelectorAll('.css-option') || [])];
+      const match = opts.find(o => o.dataset.cssValue === saved);
+      input.value = match && saved ? match.textContent.trim() : '';
+      opts.forEach(o => o.style.display = '');
+    }
+  });
 }
 
 // ── Render: Cover page ────────────────────────────────
@@ -1352,10 +1359,10 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
 // Cover view — save fields on input/change, navigate stage cards on click
 ['input', 'change'].forEach(evt => {
   document.getElementById('cover-view').addEventListener(evt, e => {
-    // Searchable select search input — filter options in-place
-    if (e.target.classList.contains('css-search')) {
+    // Searchable select: filter options as the user types
+    if (e.target.classList.contains('css-input')) {
       const q = e.target.value.toLowerCase();
-      e.target.closest('.css-dropdown')
+      e.target.closest('.cover-searchable-select')
         ?.querySelectorAll('.css-option')
         .forEach(opt => {
           opt.style.display = opt.textContent.trim().toLowerCase().includes(q) ? '' : 'none';
@@ -1370,31 +1377,45 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
   });
 });
 
-// Searchable select — toggle open/close and option selection
+// Searchable select — option selection
 document.getElementById('cover-view').addEventListener('click', e => {
   const option = e.target.closest('.css-option');
-  if (option) {
-    const field = option.dataset.cssField;
-    const value = option.dataset.cssValue;
-    if (!state.cover) state.cover = {};
-    state.cover[field] = value;
-    saveCurrentOpp();
-    closeSearchSelects();
-    renderCover();
-    return;
-  }
-  const trigger = e.target.closest('[data-css-toggle]');
-  if (trigger) {
-    const field = trigger.dataset.cssToggle;
-    openSearchSelect = openSearchSelect === field ? null : field;
-    renderCover();
-    return;
-  }
-  // Click outside any open dropdown → close
-  if (openSearchSelect && !e.target.closest('.cover-searchable-select')) {
-    closeSearchSelects();
-    renderCover();
-  }
+  if (!option) return;
+  const field = option.dataset.cssField;
+  const value = option.dataset.cssValue;
+  if (!state.cover) state.cover = {};
+  state.cover[field] = value;
+  saveCurrentOpp();
+  renderCover(); // re-render with new value; dropdown will be closed (input not focused)
+});
+
+// Searchable select — open dropdown on focus, close and restore on blur
+document.getElementById('cover-view').addEventListener('focusin', e => {
+  const input = e.target.closest('.css-input');
+  if (!input) return;
+  const container = input.closest('.cover-searchable-select');
+  container?.querySelector('.css-dropdown')?.classList.remove('hidden');
+  input.select();
+});
+
+document.getElementById('cover-view').addEventListener('focusout', e => {
+  const input = e.target.closest('.css-input');
+  if (!input) return;
+  const container = input.closest('.cover-searchable-select');
+  const dropdown  = container?.querySelector('.css-dropdown');
+  if (!dropdown) return;
+  dropdown.classList.add('hidden');
+  // Restore display value in case user typed but didn't select
+  const saved = input.dataset.cssSelected;
+  const opts  = [...container.querySelectorAll('.css-option')];
+  const match = opts.find(o => o.dataset.cssValue === saved);
+  input.value = match && saved ? match.textContent.trim() : '';
+  opts.forEach(o => o.style.display = '');
+});
+
+// Prevent click on options from blurring the input first
+document.getElementById('cover-view').addEventListener('mousedown', e => {
+  if (e.target.closest('.css-options')) e.preventDefault();
 });
 
 document.getElementById('cover-delete-btn').addEventListener('click', () => {
@@ -1504,7 +1525,7 @@ document.getElementById('users-list').addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (openSearchSelect) { closeSearchSelects(); renderCover(); return; }
+  if (document.activeElement?.classList.contains('css-input')) { document.activeElement.blur(); return; }
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
   if (!document.getElementById('prompt-edit-overlay').classList.contains('hidden'))  { closePromptEditModal(); return; }
   if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }

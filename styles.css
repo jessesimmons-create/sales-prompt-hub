@@ -2091,45 +2091,45 @@ body {
 
 /* ── Searchable select ─────────────────────────────── */
 
-.cover-searchable-select {
-  position: relative;
-}
+.cover-searchable-select { position: relative; }
 
-.css-trigger {
-  width: 100%;
+.css-wrap {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 9px 12px;
+}
+
+.css-input {
+  width: 100%;
+  padding: 9px 32px 9px 12px;
   font-size: 14px;
   font-family: inherit;
   color: var(--text);
   background: var(--card-bg);
   border: 1.5px solid var(--border);
   border-radius: 8px;
+  outline: none;
   cursor: pointer;
-  text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.css-trigger:hover {
-  border-color: #cbd5e1;
-}
+.css-input::placeholder { color: var(--text-light); }
 
-.css-trigger.open {
+.css-input:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  cursor: text;
 }
-
-.css-value { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.css-placeholder { color: var(--text-light); }
 
 .css-chevron {
-  flex-shrink: 0;
+  position: absolute;
+  right: 12px;
   color: #64748b;
+  pointer-events: none;
   transition: transform 0.15s;
 }
-.css-trigger.open .css-chevron { transform: rotate(180deg); }
+
+.cover-searchable-select:focus-within .css-chevron { transform: rotate(180deg); }
 
 .css-dropdown {
   position: absolute;
@@ -2143,27 +2143,6 @@ body {
   z-index: 200;
   overflow: hidden;
 }
-
-.css-search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.css-search-icon { color: var(--text-muted); flex-shrink: 0; }
-
-.css-search {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 13px;
-  font-family: inherit;
-  color: var(--text);
-  background: transparent;
-}
-.css-search::placeholder { color: var(--text-light); }
 
 .css-options {
   max-height: 180px;
