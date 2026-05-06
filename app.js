@@ -14,6 +14,7 @@ const SK = {
     stepsRemoved: `sph_${id}_steps_removed`,
     comments:     `sph_${id}_comments`,
     cover:        `sph_${id}_cover`,
+    attachments:  `sph_${id}_attachments`,
   }),
 };
 
@@ -51,6 +52,7 @@ function loadOppState(id) {
     stepsRemoved: new Set(JSON.parse(localStorage.getItem(k.stepsRemoved) || '[]')),
     comments:          JSON.parse(localStorage.getItem(k.comments)     || '[]'),
     cover:             JSON.parse(localStorage.getItem(k.cover)        || '{}'),
+    attachments:       JSON.parse(localStorage.getItem(k.attachments)  || '[]'),
   };
 }
 
@@ -64,6 +66,11 @@ function saveCurrentOpp() {
   localStorage.setItem(k.stepsRemoved, JSON.stringify([...state.stepsRemoved]));
   localStorage.setItem(k.comments,     JSON.stringify(state.comments));
   localStorage.setItem(k.cover,        JSON.stringify(state.cover));
+  try {
+    localStorage.setItem(k.attachments, JSON.stringify(state.attachments));
+  } catch (e) {
+    console.warn('Storage quota exceeded — attachment not saved.');
+  }
 }
 
 // ── Role helpers ──────────────────────────────────────
@@ -130,6 +137,7 @@ function createOpp(name) {
   state.stepsRemoved  = new Set();
   state.comments      = [];
   state.cover         = { opportunityOwner: state.currentEmail };
+  state.attachments   = [];
   state.activeStageId = '__cover__';
   localStorage.setItem(SK.activeOpp, id);
   saveCurrentOpp();
@@ -345,6 +353,111 @@ function renderCommentsModal() {
     </div>`).join('');
 }
 
+// ── Attachments ───────────────────────────────────────
+
+let attachmentsStepId   = null;
+let attachmentsPending  = null; // { name, url, fileType, size } for staged file upload
+let attachmentsTab      = 'link';
+
+function addAttachmentLink(stepId, name, url) {
+  const id = 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  state.attachments.push({ id, stepId, type: 'link', name: name.trim() || url, url, createdAt: Date.now() });
+  saveCurrentOpp();
+}
+
+function addAttachmentFile(stepId, name, url, fileType, size) {
+  const id = 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  state.attachments.push({ id, stepId, type: 'file', name, url, fileType, size, createdAt: Date.now() });
+  saveCurrentOpp();
+}
+
+function removeAttachment(id) {
+  state.attachments = state.attachments.filter(a => a.id !== id);
+  saveCurrentOpp();
+}
+
+function openAttachmentsModal(stepId) {
+  attachmentsStepId  = stepId;
+  attachmentsPending = null;
+  let stepTitle = stepId;
+  for (const s of STAGES) {
+    const found = effectiveSteps(s).find(x => x.id === stepId);
+    if (found) { stepTitle = found.title; break; }
+  }
+  document.getElementById('attachments-modal-step-name').textContent = stepTitle;
+  setAttachmentsTab('link');
+  document.getElementById('attachments-link-url').value  = '';
+  document.getElementById('attachments-link-name').value = '';
+  document.getElementById('attachments-link-error').classList.add('hidden');
+  document.getElementById('attachments-file-input').value = '';
+  document.getElementById('attachments-file-label').textContent = 'No file chosen';
+  document.getElementById('attachments-file-error').classList.add('hidden');
+  renderAttachmentsModal();
+  document.getElementById('attachments-overlay').classList.remove('hidden');
+}
+
+function closeAttachmentsModal() {
+  document.getElementById('attachments-overlay').classList.add('hidden');
+  attachmentsStepId  = null;
+  attachmentsPending = null;
+}
+
+function setAttachmentsTab(tab) {
+  attachmentsTab = tab;
+  document.querySelectorAll('.attachments-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('attachments-link-form').classList.toggle('hidden', tab !== 'link');
+  document.getElementById('attachments-file-form').classList.toggle('hidden', tab !== 'file');
+}
+
+function getAttachmentIcon(a) {
+  if (a.type === 'link') {
+    return `<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M8 10a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1" stroke="#6366f1" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M10 8a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1" stroke="#6366f1" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>`;
+  }
+  const ext    = (a.name || '').split('.').pop().toLowerCase();
+  const colors = { pdf:'#ef4444', doc:'#3b82f6', docx:'#3b82f6', xls:'#22c55e', xlsx:'#22c55e', ppt:'#f97316', pptx:'#f97316', png:'#8b5cf6', jpg:'#8b5cf6', jpeg:'#8b5cf6', gif:'#8b5cf6' };
+  const color  = colors[ext] || '#64748b';
+  const label  = ext.toUpperCase().slice(0, 4);
+  return `<div class="attachment-file-badge" style="background:${color}">${label}</div>`;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderAttachmentsModal() {
+  const list = document.getElementById('attachments-list');
+  const mine = state.attachments.filter(a => a.stepId === attachmentsStepId);
+  if (mine.length === 0) {
+    list.innerHTML = '<p id="attachments-empty">No attachments yet.</p>';
+    return;
+  }
+  list.innerHTML = mine.map(a => {
+    const isFile   = a.type === 'file';
+    const sizeStr  = isFile && a.size ? ` · ${formatFileSize(a.size)}` : '';
+    const typeStr  = isFile ? 'File' : 'Link';
+    const dlAttr   = isFile ? ` download="${escHtml(a.name)}"` : '';
+    return `
+      <div class="attachment-card">
+        <div class="attachment-icon">${getAttachmentIcon(a)}</div>
+        <div class="attachment-info">
+          <a class="attachment-name" href="${escHtml(a.url)}" target="_blank" rel="noopener"${dlAttr}>${escHtml(a.name)}</a>
+          <span class="attachment-meta">${typeStr}${sizeStr}</span>
+        </div>
+        <button class="attachment-delete-btn" data-delete-attachment="${a.id}" title="Remove">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>`;
+  }).join('');
+}
+
 // ── Data helpers ──────────────────────────────────────
 
 function effectivePrompts(cond) {
@@ -407,6 +520,7 @@ function ensureValidActiveOpp() {
     state.stepsRemoved  = new Set();
     state.comments      = [];
     state.cover         = { opportunityOwner: state.currentEmail };
+    state.attachments   = [];
     state.activeStageId = '__cover__';
     localStorage.setItem(SK.activeOpp, id);
     saveCurrentOpp();
@@ -635,8 +749,9 @@ function renderSteps(stage) {
     `width:${pct}%;background:${stage.color}`;
 
   const cards = steps.map(s => {
-    const done = state.stepsUsed.has(s.id);
+    const done         = state.stepsUsed.has(s.id);
     const commentCount = state.comments.filter(c => c.stepId === s.id).length;
+    const attachCount  = state.attachments.filter(a => a.stepId === s.id).length;
     return `
       <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
         <div class="prompt-card-top">
@@ -663,6 +778,12 @@ function renderSteps(stage) {
                     stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
             </svg>
             ${commentCount > 0 ? `${commentCount} comment${commentCount !== 1 ? 's' : ''}` : 'Add comment'}
+          </button>
+          <button class="step-attachments-btn ${attachCount > 0 ? 'has-attachments' : ''}" data-attachments-step="${s.id}" title="${attachCount > 0 ? `${attachCount} attachment${attachCount !== 1 ? 's' : ''}` : 'Attach document'}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            ${attachCount > 0 ? `${attachCount} file${attachCount !== 1 ? 's' : ''}` : 'Attach'}
           </button>
         </div>
       </div>`;
@@ -952,6 +1073,9 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
 
 // Steps grid
 document.getElementById('steps-grid').addEventListener('click', e => {
+  const attachBtn = e.target.closest('[data-attachments-step]');
+  if (attachBtn) { openAttachmentsModal(attachBtn.dataset.attachmentsStep); return; }
+
   const commentBtn = e.target.closest('[data-comments-step]');
   if (commentBtn) { openCommentsModal(commentBtn.dataset.commentsStep); return; }
 
@@ -1096,10 +1220,11 @@ document.getElementById('users-list').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
-  if (!document.getElementById('comments-overlay').classList.contains('hidden')) { closeCommentsModal(); return; }
-  if (!document.getElementById('users-overlay').classList.contains('hidden'))   { closeUsersModal(); return; }
-  if (!document.getElementById('modal-overlay').classList.contains('hidden'))   closeModal();
-  if (!document.getElementById('delete-overlay').classList.contains('hidden'))  closeDeleteModal();
+  if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }
+  if (!document.getElementById('comments-overlay').classList.contains('hidden'))    { closeCommentsModal(); return; }
+  if (!document.getElementById('users-overlay').classList.contains('hidden'))       { closeUsersModal(); return; }
+  if (!document.getElementById('modal-overlay').classList.contains('hidden'))       closeModal();
+  if (!document.getElementById('delete-overlay').classList.contains('hidden'))      closeDeleteModal();
 });
 
 // Comments modal events
@@ -1123,6 +1248,87 @@ document.getElementById('comments-add-btn').addEventListener('click', () => {
   addComment(commentsStepId, html);
   commentsQuill.setContents([]);
   renderCommentsModal();
+  render();
+});
+
+// ── Attachments modal events ──────────────────────────
+
+document.getElementById('attachments-modal-close').addEventListener('click', closeAttachmentsModal);
+document.getElementById('attachments-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('attachments-overlay')) closeAttachmentsModal();
+});
+
+document.getElementById('attachments-add-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.attachments-tab');
+  if (tab) setAttachmentsTab(tab.dataset.tab);
+});
+
+document.getElementById('attachments-list').addEventListener('click', e => {
+  const btn = e.target.closest('[data-delete-attachment]');
+  if (!btn) return;
+  removeAttachment(btn.dataset.deleteAttachment);
+  renderAttachmentsModal();
+  render();
+});
+
+document.getElementById('attachments-link-add').addEventListener('click', () => {
+  const urlEl  = document.getElementById('attachments-link-url');
+  const nameEl = document.getElementById('attachments-link-name');
+  const errEl  = document.getElementById('attachments-link-error');
+  const url    = urlEl.value.trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    errEl.classList.remove('hidden');
+    urlEl.focus();
+    return;
+  }
+  errEl.classList.add('hidden');
+  addAttachmentLink(attachmentsStepId, nameEl.value, url);
+  urlEl.value = '';
+  nameEl.value = '';
+  renderAttachmentsModal();
+  render();
+});
+
+document.getElementById('attachments-link-url').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('attachments-link-add').click();
+});
+
+document.getElementById('attachments-file-pick').addEventListener('click', () => {
+  document.getElementById('attachments-file-input').click();
+});
+
+document.getElementById('attachments-file-input').addEventListener('change', e => {
+  const file   = e.target.files[0];
+  const errEl  = document.getElementById('attachments-file-error');
+  const label  = document.getElementById('attachments-file-label');
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    errEl.textContent = 'File exceeds 2 MB. Use a link instead for larger files.';
+    errEl.classList.remove('hidden');
+    e.target.value = '';
+    return;
+  }
+  errEl.classList.add('hidden');
+  label.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    attachmentsPending = {
+      name:     file.name,
+      url:      ev.target.result,
+      fileType: file.name.split('.').pop().toLowerCase(),
+      size:     file.size,
+    };
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('attachments-file-add').addEventListener('click', () => {
+  if (!attachmentsPending) return;
+  addAttachmentFile(attachmentsStepId, attachmentsPending.name, attachmentsPending.url, attachmentsPending.fileType, attachmentsPending.size);
+  attachmentsPending = null;
+  document.getElementById('attachments-file-label').textContent = 'No file chosen';
+  document.getElementById('attachments-file-input').value = '';
+  renderAttachmentsModal();
   render();
 });
 

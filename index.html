@@ -198,6 +198,41 @@
     </div>
   </div>
 
+  <!-- Attachments Modal -->
+  <div id="attachments-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div id="attachments-modal">
+      <div id="attachments-modal-header">
+        <div>
+          <div id="attachments-modal-subtitle">Attachments</div>
+          <div id="attachments-modal-step-name"></div>
+        </div>
+        <button id="attachments-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="attachments-list"></div>
+      <div id="attachments-add-section">
+        <div id="attachments-add-tabs">
+          <button class="attachments-tab active" data-tab="link">🔗 Link</button>
+          <button class="attachments-tab" data-tab="file">📎 Upload File</button>
+        </div>
+        <div id="attachments-link-form">
+          <input id="attachments-link-url" type="url" placeholder="https://docs.google.com/…" autocomplete="off" />
+          <input id="attachments-link-name" type="text" placeholder="Display name (optional)" autocomplete="off" />
+          <p id="attachments-link-error" class="hidden">Please enter a valid URL starting with https://</p>
+          <button id="attachments-link-add">Add Link</button>
+        </div>
+        <div id="attachments-file-form" class="hidden">
+          <input id="attachments-file-input" type="file" style="display:none" />
+          <div id="attachments-file-pick-row">
+            <button id="attachments-file-pick">Choose File…</button>
+            <span id="attachments-file-label">No file chosen</span>
+          </div>
+          <p id="attachments-file-error" class="hidden"></p>
+          <button id="attachments-file-add">Add File</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Users Modal -->
   <div id="users-overlay" class="hidden" role="dialog" aria-modal="true">
     <div id="users-modal">
