@@ -943,56 +943,6 @@ function renderSteps(stage) {
   document.getElementById('steps-grid').innerHTML = nudge + cards + addBtn;
 }
 
-// ── Searchable select (cover page) ───────────────────
-
-function renderSearchableSelect(containerId, field, options, currentValue) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  const current = options.find(o => o.value === currentValue);
-  // Show the label in the input; empty string means placeholder will show
-  const displayVal = (current && current.value !== '') ? current.label : '';
-  el.innerHTML = `
-    <div class="css-wrap">
-      <input class="css-input"
-             type="text"
-             value="${escHtml(displayVal)}"
-             placeholder="— None —"
-             autocomplete="off"
-             spellcheck="false"
-             data-css-field="${field}"
-             data-css-selected="${escHtml(currentValue)}" />
-      <svg class="css-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <div class="css-dropdown hidden">
-      <div class="css-options">
-        ${options.map(o => `
-          <div class="css-option ${o.value === currentValue ? 'selected' : ''}"
-               data-css-value="${escHtml(o.value)}" data-css-field="${field}">
-            ${escHtml(o.label)}
-          </div>`).join('')}
-      </div>
-    </div>`;
-}
-
-function closeSearchSelects() {
-  // Close any open dropdown by restoring the input value and hiding the list
-  document.querySelectorAll('.css-input').forEach(input => {
-    const container = input.closest('.cover-searchable-select');
-    const dropdown  = container?.querySelector('.css-dropdown');
-    if (dropdown && !dropdown.classList.contains('hidden')) {
-      dropdown.classList.add('hidden');
-      const saved = input.dataset.cssSelected;
-      const opts  = [...(container?.querySelectorAll('.css-option') || [])];
-      const match = opts.find(o => o.dataset.cssValue === saved);
-      input.value = match && saved ? match.textContent.trim() : '';
-      opts.forEach(o => o.style.display = '');
-    }
-  });
-}
-
 // ── Render: Cover page ────────────────────────────────
 
 function renderCover() {
@@ -1013,12 +963,14 @@ function renderCover() {
   document.getElementById('cover-close-date').value = c.closeDate        || '';
   document.getElementById('cover-notes').value      = c.notes            || '';
 
-  const userOptions = [
-    { value: '', label: '— None —' },
-    ...state.users.map(u => ({ value: u.email, label: u.email })),
-  ];
-  renderSearchableSelect('cover-sales-engineer',      'salesEngineer',      userOptions, c.salesEngineer      || '');
-  renderSearchableSelect('cover-additional-resource', 'additionalResource', userOptions, c.additionalResource || '');
+  const userOpts = '<option value="">— None —</option>' +
+    state.users.map(u =>
+      `<option value="${escHtml(u.email)}">${escHtml(u.email)}</option>`
+    ).join('');
+  document.getElementById('cover-sales-engineer').innerHTML      = userOpts;
+  document.getElementById('cover-additional-resource').innerHTML = userOpts;
+  document.getElementById('cover-sales-engineer').value      = c.salesEngineer      || '';
+  document.getElementById('cover-additional-resource').value = c.additionalResource || '';
 
   document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
     const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(s);
@@ -1228,7 +1180,6 @@ document.getElementById('stage-list').addEventListener('click', e => {
   const item = e.target.closest('.stage-item');
   if (!item) return;
   pendingWeightChange = null;
-  closeSearchSelects();
   const stageId = item.dataset.stage;
   if (stageId === '__cover__') {
     state.activeStageId = '__cover__';
@@ -1359,16 +1310,6 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
 // Cover view — save fields on input/change, navigate stage cards on click
 ['input', 'change'].forEach(evt => {
   document.getElementById('cover-view').addEventListener(evt, e => {
-    // Searchable select: filter options as the user types
-    if (e.target.classList.contains('css-input')) {
-      const q = e.target.value.toLowerCase();
-      e.target.closest('.cover-searchable-select')
-        ?.querySelectorAll('.css-option')
-        .forEach(opt => {
-          opt.style.display = opt.textContent.trim().toLowerCase().includes(q) ? '' : 'none';
-        });
-      return;
-    }
     const field = e.target.dataset.coverField;
     if (!field) return;
     if (!state.cover) state.cover = {};
@@ -1377,46 +1318,6 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
   });
 });
 
-// Searchable select — option selection
-document.getElementById('cover-view').addEventListener('click', e => {
-  const option = e.target.closest('.css-option');
-  if (!option) return;
-  const field = option.dataset.cssField;
-  const value = option.dataset.cssValue;
-  if (!state.cover) state.cover = {};
-  state.cover[field] = value;
-  saveCurrentOpp();
-  renderCover(); // re-render with new value; dropdown will be closed (input not focused)
-});
-
-// Searchable select — open dropdown on focus, close and restore on blur
-document.getElementById('cover-view').addEventListener('focusin', e => {
-  const input = e.target.closest('.css-input');
-  if (!input) return;
-  const container = input.closest('.cover-searchable-select');
-  container?.querySelector('.css-dropdown')?.classList.remove('hidden');
-  input.select();
-});
-
-document.getElementById('cover-view').addEventListener('focusout', e => {
-  const input = e.target.closest('.css-input');
-  if (!input) return;
-  const container = input.closest('.cover-searchable-select');
-  const dropdown  = container?.querySelector('.css-dropdown');
-  if (!dropdown) return;
-  dropdown.classList.add('hidden');
-  // Restore display value in case user typed but didn't select
-  const saved = input.dataset.cssSelected;
-  const opts  = [...container.querySelectorAll('.css-option')];
-  const match = opts.find(o => o.dataset.cssValue === saved);
-  input.value = match && saved ? match.textContent.trim() : '';
-  opts.forEach(o => o.style.display = '');
-});
-
-// Prevent click on options from blurring the input first
-document.getElementById('cover-view').addEventListener('mousedown', e => {
-  if (e.target.closest('.css-options')) e.preventDefault();
-});
 
 document.getElementById('cover-delete-btn').addEventListener('click', () => {
   const opp = state.opps.find(o => o.id === state.activeOppId);
@@ -1525,7 +1426,6 @@ document.getElementById('users-list').addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  if (document.activeElement?.classList.contains('css-input')) { document.activeElement.blur(); return; }
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
   if (!document.getElementById('prompt-edit-overlay').classList.contains('hidden'))  { closePromptEditModal(); return; }
   if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }
