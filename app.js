@@ -808,6 +808,7 @@ function renderCover() {
 
   const opp = state.opps.find(o => o.id === state.activeOppId);
   document.getElementById('cover-opp-name').textContent = opp?.name || '—';
+  document.getElementById('cover-delete-btn').classList.toggle('hidden', visibleOpps().length <= 1);
 
   const c = state.cover;
   document.getElementById('cover-opp-owner').value  = c.opportunityOwner || '';
@@ -1127,6 +1128,12 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
     state.cover[field] = e.target.value;
     saveCurrentOpp();
   });
+});
+
+document.getElementById('cover-delete-btn').addEventListener('click', () => {
+  const opp = state.opps.find(o => o.id === state.activeOppId);
+  if (!confirm(`Delete "${opp?.name || 'this deal'}"? This cannot be undone.`)) return;
+  deleteOpp(state.activeOppId);
 });
 
 document.getElementById('cover-stages-grid').addEventListener('click', e => {

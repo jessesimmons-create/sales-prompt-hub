@@ -1623,7 +1623,31 @@ body {
   color: #f1f5f9;
   line-height: 1.25;
   word-break: break-word;
+  flex: 1;
 }
+
+#cover-delete-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255,255,255,0.07);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  margin-left: 12px;
+}
+
+#cover-delete-btn:hover {
+  background: rgba(239,68,68,0.25);
+  color: #fca5a5;
+}
+
+#cover-delete-btn.hidden { display: none; }
 
 #cover-body {
   flex: 1;
