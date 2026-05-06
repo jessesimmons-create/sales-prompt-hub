@@ -5,6 +5,7 @@ const SK = {
   activeOpp:    'sph_active_opp',
   currentEmail: 'sph_current_email',
   users:        'sph_users',
+  weights:      'sph_weights',
   opp: id => ({
     used:         `sph_${id}_used`,
     added:        `sph_${id}_added`,
@@ -96,8 +97,9 @@ if (opps.length === 0) {
 const savedActiveId = localStorage.getItem(SK.activeOpp);
 const initialOppId  = opps.find(o => o.id === savedActiveId) ? savedActiveId : opps[0].id;
 
-const storedUsers = JSON.parse(localStorage.getItem(SK.users) || '[]');
-const storedEmail = localStorage.getItem(SK.currentEmail) || '';
+const storedUsers   = JSON.parse(localStorage.getItem(SK.users)   || '[]');
+const storedEmail   = localStorage.getItem(SK.currentEmail) || '';
+const storedWeights = JSON.parse(localStorage.getItem(SK.weights) || '{}');
 
 const state = {
   opps,
@@ -109,6 +111,7 @@ const state = {
   users:           storedUsers,
   currentEmail:    storedEmail,
   role:            determineRole(storedEmail, storedUsers),
+  weights:         storedWeights,
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -190,6 +193,29 @@ function toggleUserRole(email) {
     state.role = user.role;
     render();
   }
+}
+
+// ── Step weights ─────────────────────────────────────
+
+function saveWeights() {
+  localStorage.setItem(SK.weights, JSON.stringify(state.weights));
+}
+
+function getStepWeight(stepId) {
+  const dealType = state.cover?.dealType;
+  if (!dealType) return 1;
+  return (state.weights[dealType]?.[stepId]) ?? 1;
+}
+
+function setStepWeight(dealType, stepId, weight) {
+  if (!state.weights[dealType]) state.weights[dealType] = {};
+  if (weight === 1) {
+    delete state.weights[dealType][stepId];
+    if (Object.keys(state.weights[dealType]).length === 0) delete state.weights[dealType];
+  } else {
+    state.weights[dealType][stepId] = weight;
+  }
+  saveWeights();
 }
 
 // ── Email gate ────────────────────────────────────────
@@ -483,8 +509,14 @@ function condStats(cond) {
 }
 
 function stepStats(stage) {
-  const steps = effectiveSteps(stage);
-  return { total: steps.length, used: steps.filter(s => state.stepsUsed.has(s.id)).length };
+  const steps        = effectiveSteps(stage);
+  const used         = steps.filter(s => state.stepsUsed.has(s.id)).length;
+  const total        = steps.length;
+  const weightedTotal = steps.reduce((sum, s) => sum + getStepWeight(s.id), 0);
+  const weightedUsed  = steps
+    .filter(s => state.stepsUsed.has(s.id))
+    .reduce((sum, s) => sum + getStepWeight(s.id), 0);
+  return { total, used, weightedTotal, weightedUsed };
 }
 
 // ── Visibility helpers ────────────────────────────────
@@ -644,8 +676,11 @@ function renderHeader(stage) {
   document.getElementById('stage-header-title').textContent = stage.name;
   document.getElementById('reset-stage-btn').dataset.stage  = stage.id;
   if (state.activeCondId === '__steps__') {
-    const { total, used } = stepStats(stage);
-    document.getElementById('stage-stats').textContent = `${used} of ${total} steps completed`;
+    const { total, used, weightedTotal, weightedUsed } = stepStats(stage);
+    const isWeighted = !!(state.cover?.dealType) && weightedTotal !== total;
+    document.getElementById('stage-stats').textContent = isWeighted
+      ? `${weightedUsed} of ${weightedTotal} points`
+      : `${used} of ${total} steps completed`;
   } else {
     const { total, used } = stageStats(stage);
     document.getElementById('stage-stats').textContent = `${used} of ${total} prompts used`;
@@ -666,8 +701,8 @@ function renderTabs(stage) {
       </div>`;
   }).join('');
 
-  const { total: sTotal, used: sUsed } = stepStats(stage);
-  const pct       = sTotal ? Math.round((sUsed / sTotal) * 100) : 0;
+  const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(stage);
+  const pct       = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
   const stepState = pct === 100 ? 'complete' : pct > 0 ? 'in-progress' : '';
 
   document.getElementById('condition-tabs').innerHTML = condTabs + `
@@ -737,21 +772,36 @@ function renderSteps(stage) {
   document.getElementById('prompts-grid').style.display     = 'none';
   document.getElementById('steps-view').classList.remove('hidden');
 
-  const steps = effectiveSteps(stage);
-  const used  = steps.filter(s => state.stepsUsed.has(s.id)).length;
-  const total = steps.length;
-  const pct   = total ? Math.round((used / total) * 100) : 0;
+  const steps    = effectiveSteps(stage);
+  const dealType = state.cover?.dealType;
+  const { used, total, weightedUsed, weightedTotal } = stepStats(stage);
+  const isWeighted = !!dealType && weightedTotal !== total;
+  const pct = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
 
-  document.getElementById('steps-count-label').textContent       = `${used} of ${total} steps completed`;
-  document.getElementById('steps-pct-label').textContent         = `${pct}%`;
-  document.getElementById('steps-pct-label').style.color         = stage.color;
-  document.getElementById('steps-progress-fill').style.cssText   =
-    `width:${pct}%;background:${stage.color}`;
+  document.getElementById('steps-count-label').textContent     = isWeighted
+    ? `${weightedUsed} of ${weightedTotal} points`
+    : `${used} of ${total} steps completed`;
+  document.getElementById('steps-pct-label').textContent       = `${pct}%`;
+  document.getElementById('steps-pct-label').style.color       = stage.color;
+  document.getElementById('steps-progress-fill').style.cssText = `width:${pct}%;background:${stage.color}`;
+
+  // No-deal-type nudge (spans full grid width)
+  const nudge = !dealType ? `
+    <div class="steps-deal-type-nudge">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="flex-shrink:0">
+        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M7 4v3.5M7 9.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Set a <strong>Deal Type</strong> on the Deal Overview to enable weighted step progress.</span>
+      <button class="steps-goto-cover-btn">Deal Overview →</button>
+    </div>` : '';
 
   const cards = steps.map(s => {
     const done         = state.stepsUsed.has(s.id);
     const commentCount = state.comments.filter(c => c.stepId === s.id).length;
     const attachCount  = state.attachments.filter(a => a.stepId === s.id).length;
+    const weight       = getStepWeight(s.id);
+    const showWeight   = !!dealType && (state.role === 'admin' || weight > 1);
     return `
       <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
         <div class="prompt-card-top">
@@ -779,12 +829,18 @@ function renderSteps(stage) {
             </svg>
             ${commentCount > 0 ? `${commentCount} comment${commentCount !== 1 ? 's' : ''}` : 'Add comment'}
           </button>
-          <button class="step-attachments-btn ${attachCount > 0 ? 'has-attachments' : ''}" data-attachments-step="${s.id}" title="${attachCount > 0 ? `${attachCount} attachment${attachCount !== 1 ? 's' : ''}` : 'Attach document'}">
+          <button class="step-attachments-btn ${attachCount > 0 ? 'has-attachments' : ''}" data-attachments-step="${s.id}">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
             </svg>
             ${attachCount > 0 ? `${attachCount} file${attachCount !== 1 ? 's' : ''}` : 'Attach'}
           </button>
+          ${showWeight ? `
+          <button class="step-weight-btn ${weight > 1 ? 'is-weighted' : ''} ${state.role !== 'admin' ? 'read-only' : ''}"
+                  ${state.role === 'admin' ? `data-weight-step="${s.id}"` : ''}
+                  title="${state.role === 'admin' ? `Weight: ×${weight} — click to change` : `Weight: ×${weight}`}">
+            ×${weight}
+          </button>` : ''}
         </div>
       </div>`;
   }).join('');
@@ -796,7 +852,7 @@ function renderSteps(stage) {
       </svg>
       Add Step
     </button>` : '';
-  document.getElementById('steps-grid').innerHTML = cards + addBtn;
+  document.getElementById('steps-grid').innerHTML = nudge + cards + addBtn;
 }
 
 // ── Render: Cover page ────────────────────────────────
@@ -812,6 +868,7 @@ function renderCover() {
 
   const c = state.cover;
   document.getElementById('cover-opp-owner').value  = c.opportunityOwner || '';
+  document.getElementById('cover-deal-type').value  = c.dealType         || '';
   document.getElementById('cover-company').value    = c.company          || '';
   document.getElementById('cover-contact').value    = c.contact          || '';
   document.getElementById('cover-deal-value').value = c.dealValue        || '';
@@ -828,9 +885,9 @@ function renderCover() {
   document.getElementById('cover-additional-resource').value = c.additionalResource || '';
 
   document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
-    const { total: sTotal, used: sUsed } = stepStats(s);
+    const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(s);
     const { total: pTotal, used: pUsed } = stageStats(s);
-    const pct = sTotal ? Math.round((sUsed / sTotal) * 100) : 0;
+    const pct = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
     return `
       <div class="cover-stage-card" data-nav-stage="${s.id}" style="--stage-color:${s.color}">
         <div class="cover-stage-header">
@@ -1074,6 +1131,26 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
 
 // Steps grid
 document.getElementById('steps-grid').addEventListener('click', e => {
+  // "Deal Overview →" nudge button
+  if (e.target.closest('.steps-goto-cover-btn')) {
+    state.activeStageId = '__cover__';
+    render();
+    return;
+  }
+
+  // Weight badge (admin only)
+  const weightBtn = e.target.closest('[data-weight-step]');
+  if (weightBtn && state.role === 'admin') {
+    e.stopPropagation();
+    const dealType = state.cover?.dealType;
+    if (!dealType) return;
+    const stepId  = weightBtn.dataset.weightStep;
+    const current = getStepWeight(stepId);
+    setStepWeight(dealType, stepId, current >= 5 ? 1 : current + 1);
+    render();
+    return;
+  }
+
   const attachBtn = e.target.closest('[data-attachments-step]');
   if (attachBtn) { openAttachmentsModal(attachBtn.dataset.attachmentsStep); return; }
 

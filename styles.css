@@ -863,6 +863,95 @@ body {
 .prompt-card.used .step-attachments-btn:hover { color: #4ade80; background: rgba(255,255,255,0.3); }
 .prompt-card.used .step-attachments-btn.has-attachments { color: #15803d; }
 
+/* ── Step weight badge ────────────────────────────────── */
+
+.step-weight-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.step-weight-btn:not(.read-only):hover {
+  border-color: #cbd5e1;
+  color: var(--text-muted);
+  background: #f1f5f9;
+}
+
+.step-weight-btn.is-weighted {
+  background: color-mix(in srgb, #f59e0b 12%, white);
+  border-color: color-mix(in srgb, #f59e0b 35%, white);
+  color: #b45309;
+}
+
+.step-weight-btn.is-weighted:not(.read-only):hover {
+  background: color-mix(in srgb, #f59e0b 20%, white);
+}
+
+.step-weight-btn.read-only { cursor: default; }
+
+.prompt-card.used .step-weight-btn {
+  border-color: #bbf7d0;
+  color: #86efac;
+  background: transparent;
+}
+
+.prompt-card.used .step-weight-btn.is-weighted {
+  border-color: #4ade80;
+  color: #15803d;
+}
+
+/* ── Steps deal-type nudge banner ─────────────────────── */
+
+.steps-deal-type-nudge {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+.steps-deal-type-nudge strong { font-weight: 700; }
+
+.steps-goto-cover-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1.5px solid #fbbf24;
+  background: transparent;
+  color: #92400e;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.steps-goto-cover-btn:hover { background: #fef3c7; }
+
 /* ── Attachments modal ───────────────────────────────── */
 
 #attachments-modal {
