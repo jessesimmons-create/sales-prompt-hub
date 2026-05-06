@@ -702,14 +702,16 @@ function renderSidebar() {
       </div>
     </div>`;
   document.getElementById('stage-list').innerHTML = coverItem + STAGES.map(s => {
-    const { total: sTotal, used: sUsed } = stepStats(s);
+    const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(s);
     const stepsComplete = sTotal > 0 && sUsed === sTotal;
+    const pct = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
     return `
       <div class="stage-item ${s.id === state.activeStageId ? 'active' : ''} ${stepsComplete ? 'has-used' : ''}"
            style="--stage-color:${s.color}" data-stage="${s.id}">
         <div class="stage-item-row">
           <span class="stage-icon">${s.icon}</span>
           <span class="stage-name">${s.name}</span>
+          <span class="stage-badge">${pct > 0 ? pct + '%' : ''}</span>
           <span class="stage-check">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
               <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" stroke-width="1.6"

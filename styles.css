@@ -246,11 +246,12 @@ body {
 
 .stage-badge {
   font-size: 10px;
-  font-weight: 600;
-  color: #475569;
+  font-weight: 700;
+  color: var(--stage-color);
   min-width: 30px;
   text-align: right;
   flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .stage-check {
