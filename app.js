@@ -8,7 +8,6 @@ const SK = {
   weights:      'sph_weights',
   promptEdits:  'sph_prompt_edits',
   opp: id => ({
-    used:         `sph_${id}_used`,
     added:        `sph_${id}_added`,
     removed:      `sph_${id}_removed`,
     stepsUsed:    `sph_${id}_steps_used`,
@@ -25,7 +24,6 @@ const SK = {
   if (localStorage.getItem(SK.opps)) return;
   const id = 'opp_default';
   const keyMap = {
-    'sph_used_v1':         SK.opp(id).used,
     'sph_added_v1':        SK.opp(id).added,
     'sph_removed_v1':      SK.opp(id).removed,
     'sph_steps_used_v1':   SK.opp(id).stepsUsed,
@@ -46,7 +44,6 @@ const SK = {
 function loadOppState(id) {
   const k = SK.opp(id);
   return {
-    used:         new Set(JSON.parse(localStorage.getItem(k.used)         || '[]')),
     added:             JSON.parse(localStorage.getItem(k.added)        || '[]'),
     removed:      new Set(JSON.parse(localStorage.getItem(k.removed)      || '[]')),
     stepsUsed:    new Set(JSON.parse(localStorage.getItem(k.stepsUsed)    || '[]')),
@@ -60,7 +57,6 @@ function loadOppState(id) {
 
 function saveCurrentOpp() {
   const k = SK.opp(state.activeOppId);
-  localStorage.setItem(k.used,         JSON.stringify([...state.used]));
   localStorage.setItem(k.added,        JSON.stringify(state.added));
   localStorage.setItem(k.removed,      JSON.stringify([...state.removed]));
   localStorage.setItem(k.stepsUsed,    JSON.stringify([...state.stepsUsed]));
@@ -135,7 +131,6 @@ function createOpp(name) {
   state.opps.push(opp);
   localStorage.setItem(SK.opps, JSON.stringify(state.opps));
   state.activeOppId   = id;
-  state.used          = new Set();
   state.added         = [];
   state.removed       = new Set();
   state.stepsUsed     = new Set();
@@ -568,16 +563,6 @@ function effectiveSteps(stage) {
   return [...base, ...custom];
 }
 
-function stageStats(stage) {
-  const prompts = stage.conditions.flatMap(c => effectivePrompts(c));
-  return { total: prompts.length, used: prompts.filter(p => state.used.has(p.id)).length };
-}
-
-function condStats(cond) {
-  const prompts = effectivePrompts(cond);
-  return { total: prompts.length, used: prompts.filter(p => state.used.has(p.id)).length };
-}
-
 function stepStats(stage) {
   const steps        = effectiveSteps(stage);
   const used         = steps.filter(s => state.stepsUsed.has(s.id)).length;
@@ -614,7 +599,6 @@ function ensureValidActiveOpp() {
     state.opps.push(opp);
     localStorage.setItem(SK.opps, JSON.stringify(state.opps));
     state.activeOppId   = id;
-    state.used          = new Set();
     state.added         = [];
     state.removed       = new Set();
     state.stepsUsed     = new Set();
@@ -718,7 +702,6 @@ function renderSidebar() {
       </div>
     </div>`;
   document.getElementById('stage-list').innerHTML = coverItem + STAGES.map(s => {
-    const { total, used } = stageStats(s);
     const { total: sTotal, used: sUsed } = stepStats(s);
     const stepsComplete = sTotal > 0 && sUsed === sTotal;
     return `
@@ -727,7 +710,6 @@ function renderSidebar() {
         <div class="stage-item-row">
           <span class="stage-icon">${s.icon}</span>
           <span class="stage-name">${s.name}</span>
-          <span class="stage-badge">${used}/${total}</span>
           <span class="stage-check">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
               <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" stroke-width="1.6"
@@ -752,8 +734,7 @@ function renderHeader(stage) {
       ? `${weightedUsed} of ${weightedTotal} points`
       : `${used} of ${total} steps completed`;
   } else {
-    const { total, used } = stageStats(stage);
-    document.getElementById('stage-stats').textContent = `${used} of ${total} prompts used`;
+    document.getElementById('stage-stats').textContent = '';
   }
 }
 
@@ -761,13 +742,10 @@ function renderHeader(stage) {
 
 function renderTabs(stage) {
   const condTabs = stage.conditions.map(c => {
-    const { total, used } = condStats(c);
-    const allDone = total > 0 && used === total;
     return `
-      <div class="cond-tab ${c.id === state.activeCondId ? 'active' : ''} ${allDone ? 'all-done' : ''}"
+      <div class="cond-tab ${c.id === state.activeCondId ? 'active' : ''}"
            style="--active-color:${stage.color}" data-cond="${c.id}">
         ${c.name}
-        <span class="cond-tab-count">${used}/${total}</span>
       </div>`;
   }).join('');
 
@@ -801,7 +779,6 @@ function renderPrompts(stage) {
   const isAdmin = state.role === 'admin';
   const cards = effectivePrompts(cond).map(p => {
     const ep      = getEffectivePrompt(p);
-    const used    = state.used.has(p.id);
     const hasCopy = !isAdmin && !!ep.body;
     const cardCls = isAdmin ? 'prompt-editable' : hasCopy ? 'prompt-copyable' : '';
     const bodyEl  = ep.explanation
@@ -810,14 +787,8 @@ function renderPrompts(stage) {
         ? `<div class="prompt-body prompt-no-desc">No description yet — click to edit.</div>`
         : '';
     return `
-      <div class="prompt-card ${used ? 'used' : ''} ${cardCls}" data-prompt="${p.id}">
+      <div class="prompt-card ${cardCls}" data-prompt="${p.id}">
         <div class="prompt-card-top">
-          <div class="prompt-check">
-            <svg class="check-icon" viewBox="0 0 11 11" fill="none">
-              <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
           <span class="prompt-title">${escHtml(ep.title)}</span>
           ${hasCopy ? `
           <span class="prompt-copy-badge" title="Click to copy prompt to clipboard">
@@ -836,7 +807,6 @@ function renderPrompts(stage) {
           </span>` : ''}
         </div>
         ${bodyEl}
-        <span class="used-pill">✓ Used</span>
         ${isAdmin ? `
         <button class="prompt-delete-btn" data-delete-prompt="${p.id}" title="Remove prompt">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1002,7 +972,6 @@ function renderCover() {
 
   document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
     const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(s);
-    const { total: pTotal, used: pUsed } = stageStats(s);
     const pct = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
     return `
       <div class="cover-stage-card" data-nav-stage="${s.id}" style="--stage-color:${s.color}">
@@ -1010,7 +979,7 @@ function renderCover() {
           <span class="cover-stage-icon">${s.icon}</span>
           <span class="cover-stage-name">${escHtml(s.name)}</span>
         </div>
-        <div class="cover-stage-stats">${sUsed}/${sTotal} steps &middot; ${pUsed}/${pTotal} prompts</div>
+        <div class="cover-stage-stats">${sUsed}/${sTotal} steps</div>
         <div class="cover-stage-bar-track">
           <div class="cover-stage-bar-fill" style="width:${pct}%;background:${s.color}"></div>
         </div>
@@ -1162,7 +1131,6 @@ function confirmDelete() {
     state.stepsAdded = state.stepsAdded.filter(s => s.id !== id);
   } else {
     state.removed.add(id);
-    state.used.delete(id);
     state.added = state.added.filter(p => p.id !== id);
   }
 
@@ -1244,30 +1212,15 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
   const id = card.dataset.prompt;
 
   if (state.role === 'admin') {
-    // Checkbox or "✓ Used" pill → toggle used state
-    if (e.target.closest('.prompt-check') || e.target.closest('.used-pill')) {
-      if (state.used.has(id)) state.used.delete(id); else state.used.add(id);
-      saveCurrentOpp();
-      render();
-    } else {
-      // Anywhere else on card → open edit modal
-      openPromptEditModal(id);
-    }
+    // Click anywhere on card → open edit modal
+    openPromptEditModal(id);
     return;
   }
 
-  // Standard user: copy body to clipboard, mark as used, flash "Copied!"
+  // Standard user: copy body to clipboard, flash "Copied!"
   const ep = getEffectivePromptById(id);
   if (ep.body) {
     navigator.clipboard.writeText(ep.body).catch(() => {});
-  }
-  if (!state.used.has(id)) {
-    state.used.add(id);
-    saveCurrentOpp();
-  }
-  render();
-  // Flash "Copied!" overlay on the freshly rendered card
-  if (ep.body) {
     const freshCard = document.querySelector(`[data-prompt="${id}"]`);
     if (freshCard) {
       freshCard.classList.add('prompt-copied');
@@ -1332,7 +1285,6 @@ document.getElementById('steps-grid').addEventListener('click', e => {
 // Reset buttons
 document.getElementById('reset-stage-btn').addEventListener('click', () => {
   const stage = STAGES.find(s => s.id === state.activeStageId);
-  stage.conditions.forEach(c => effectivePrompts(c).forEach(p => state.used.delete(p.id)));
   effectiveSteps(stage).forEach(s => state.stepsUsed.delete(s.id));
   saveCurrentOpp();
   render();
@@ -1347,8 +1299,7 @@ document.getElementById('email-gate-input').addEventListener('keydown', e => {
 });
 
 document.getElementById('reset-all-btn').addEventListener('click', () => {
-  if (!confirm('Reset all used prompts and steps for this opportunity?')) return;
-  state.used.clear();
+  if (!confirm('Reset all step progress for this opportunity?')) return;
   state.stepsUsed.clear();
   saveCurrentOpp();
   render();
