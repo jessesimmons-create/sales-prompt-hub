@@ -2089,6 +2089,106 @@ body {
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
 
+/* ── Cover user-select ───────────────────────────────── */
+
+.cover-user-select { position: relative; }
+
+.cus-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cus-trigger:hover { border-color: #cbd5e1; }
+
+.cus-trigger.open {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.cus-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cus-placeholder { color: var(--text-light); }
+
+.cus-chevron {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: transform 0.15s;
+}
+.cus-trigger.open .cus-chevron { transform: rotate(180deg); }
+
+.cus-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 200;
+  overflow: hidden;
+  animation: dropDown 0.15s ease;
+}
+
+.cus-dropdown.hidden { display: none; }
+
+.cus-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cus-search-icon { flex-shrink: 0; color: var(--text-muted); }
+
+.cus-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.cus-search-input::placeholder { color: var(--text-light); }
+
+.cus-list {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.cus-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.cus-item:hover { background: #f1f5f9; color: var(--text); }
+.cus-item.active { color: var(--text); font-weight: 500; }
+
+.cus-check-icon { flex-shrink: 0; }
+.cus-item:not(.active) .cus-check-icon { visibility: hidden; }
+
 
 .cover-textarea {
   width: 100%;

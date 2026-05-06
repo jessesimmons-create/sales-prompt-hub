@@ -943,6 +943,58 @@ function renderSteps(stage) {
   document.getElementById('steps-grid').innerHTML = nudge + cards + addBtn;
 }
 
+// ── Cover user-select (Sales Engineer / Additional Resource) ──
+
+let openCoverSelect = null; // field name of currently open picker
+
+function renderCoverUserSelect(containerId, field, users, currentValue) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const isOpen    = openCoverSelect === field;
+  const current   = users.find(u => u === currentValue);
+  const label     = current || '— None —';
+  const isDefault = !current;
+
+  const items = [
+    { value: '', label: '— None —' },
+    ...users.map(u => ({ value: u, label: u })),
+  ];
+
+  el.innerHTML = `
+    <button class="cus-trigger ${isOpen ? 'open' : ''}" type="button" data-cus-toggle="${field}">
+      <span class="cus-label ${isDefault ? 'cus-placeholder' : ''}">${escHtml(label)}</span>
+      <svg class="cus-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div class="cus-dropdown ${isOpen ? '' : 'hidden'}">
+      <div class="cus-search-wrap">
+        <svg class="cus-search-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 8l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input class="cus-search-input" type="text" placeholder="Search…" autocomplete="off" />
+      </div>
+      <div class="cus-list">
+        ${items.map(item => `
+          <div class="cus-item ${item.value === currentValue ? 'active' : ''}"
+               data-cus-value="${escHtml(item.value)}" data-cus-field="${field}">
+            <svg class="cus-check-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 6L5 9L10 3" stroke="#6366f1" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>${escHtml(item.label)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  if (isOpen) {
+    const input = el.querySelector('.cus-search-input');
+    setTimeout(() => input?.focus(), 0);
+  }
+}
+
 // ── Render: Cover page ────────────────────────────────
 
 function renderCover() {
@@ -963,14 +1015,9 @@ function renderCover() {
   document.getElementById('cover-close-date').value = c.closeDate        || '';
   document.getElementById('cover-notes').value      = c.notes            || '';
 
-  const userOpts = '<option value="">— None —</option>' +
-    state.users.map(u =>
-      `<option value="${escHtml(u.email)}">${escHtml(u.email)}</option>`
-    ).join('');
-  document.getElementById('cover-sales-engineer').innerHTML      = userOpts;
-  document.getElementById('cover-additional-resource').innerHTML = userOpts;
-  document.getElementById('cover-sales-engineer').value      = c.salesEngineer      || '';
-  document.getElementById('cover-additional-resource').value = c.additionalResource || '';
+  const userEmails = state.users.map(u => u.email);
+  renderCoverUserSelect('cover-sales-engineer',      'salesEngineer',      userEmails, c.salesEngineer      || '');
+  renderCoverUserSelect('cover-additional-resource', 'additionalResource', userEmails, c.additionalResource || '');
 
   document.getElementById('cover-stages-grid').innerHTML = STAGES.map(s => {
     const { total: sTotal, used: sUsed, weightedTotal, weightedUsed } = stepStats(s);
@@ -1319,6 +1366,42 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
 });
 
 
+// Cover user-select events (trigger, search, option selection)
+document.getElementById('cover-view').addEventListener('click', e => {
+  // Option click → save and close
+  const item = e.target.closest('[data-cus-value]');
+  if (item) {
+    if (!state.cover) state.cover = {};
+    state.cover[item.dataset.cusField] = item.dataset.cusValue;
+    saveCurrentOpp();
+    openCoverSelect = null;
+    renderCover();
+    return;
+  }
+  // Trigger click → toggle dropdown
+  const trigger = e.target.closest('[data-cus-toggle]');
+  if (trigger) {
+    const field = trigger.dataset.cusToggle;
+    openCoverSelect = openCoverSelect === field ? null : field;
+    renderCover();
+    return;
+  }
+  // Click outside → close
+  if (openCoverSelect && !e.target.closest('.cover-user-select')) {
+    openCoverSelect = null;
+    renderCover();
+  }
+});
+
+// Search input filters the list in-place
+document.getElementById('cover-view').addEventListener('input', e => {
+  if (!e.target.classList.contains('cus-search-input')) return;
+  const q = e.target.value.toLowerCase();
+  e.target.closest('.cus-dropdown')?.querySelectorAll('.cus-item').forEach(item => {
+    item.style.display = item.textContent.trim().toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
 document.getElementById('cover-delete-btn').addEventListener('click', () => {
   const opp = state.opps.find(o => o.id === state.activeOppId);
   if (!confirm(`Delete "${opp?.name || 'this deal'}"? This cannot be undone.`)) return;
@@ -1426,6 +1509,7 @@ document.getElementById('users-list').addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (openCoverSelect) { openCoverSelect = null; renderCover(); return; }
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
   if (!document.getElementById('prompt-edit-overlay').classList.contains('hidden'))  { closePromptEditModal(); return; }
   if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }
