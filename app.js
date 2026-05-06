@@ -385,6 +385,8 @@ let attachmentsStepId   = null;
 let attachmentsPending  = null; // { name, url, fileType, size } for staged file upload
 let attachmentsTab      = 'link';
 
+let pendingWeightChange = null; // { stepId, stepTitle, dealType, newWeight }
+
 function addAttachmentLink(stepId, name, url) {
   const id = 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
   state.attachments.push({ id, stepId, type: 'link', name: name.trim() || url, url, createdAt: Date.now() });
@@ -785,6 +787,27 @@ function renderSteps(stage) {
   document.getElementById('steps-pct-label').style.color       = stage.color;
   document.getElementById('steps-progress-fill').style.cssText = `width:${pct}%;background:${stage.color}`;
 
+  // Confirmation banner for pending weight change
+  const wBanner = document.getElementById('steps-weight-banner');
+  if (pendingWeightChange) {
+    const dtName    = pendingWeightChange.dealType === 'new-logo' ? 'New Logo' : 'Expansion / Upsell';
+    const wLabel    = pendingWeightChange.newWeight === 1 ? '×1 (default)' : `×${pendingWeightChange.newWeight}`;
+    wBanner.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex-shrink:0">
+        <path d="M7.5 1.5L13.5 12.5H1.5L7.5 1.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M7.5 5.5v3M7.5 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <span>Set <strong>"${escHtml(pendingWeightChange.stepTitle)}"</strong> to <strong>${wLabel}</strong> for all <strong>${escHtml(dtName)}</strong> deals?</span>
+      <div class="steps-weight-confirm-actions">
+        <button id="steps-weight-cancel">Cancel</button>
+        <button id="steps-weight-confirm">Apply to All</button>
+      </div>`;
+    wBanner.classList.remove('hidden');
+  } else {
+    wBanner.innerHTML = '';
+    wBanner.classList.add('hidden');
+  }
+
   // No-deal-type nudge (spans full grid width)
   const nudge = !dealType ? `
     <div class="steps-deal-type-nudge">
@@ -800,8 +823,11 @@ function renderSteps(stage) {
     const done         = state.stepsUsed.has(s.id);
     const commentCount = state.comments.filter(c => c.stepId === s.id).length;
     const attachCount  = state.attachments.filter(a => a.stepId === s.id).length;
-    const weight       = getStepWeight(s.id);
-    const showWeight   = !!dealType && (state.role === 'admin' || weight > 1);
+    const weight        = getStepWeight(s.id);
+    const isPending     = pendingWeightChange?.stepId === s.id;
+    const displayWeight = isPending ? pendingWeightChange.newWeight : weight;
+    const showWeight    = !!dealType && (state.role === 'admin' || weight > 1 || isPending);
+    const weightClass   = isPending ? 'is-pending' : (weight > 1 ? 'is-weighted' : '');
     return `
       <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
         <div class="prompt-card-top">
@@ -836,10 +862,10 @@ function renderSteps(stage) {
             ${attachCount > 0 ? `${attachCount} file${attachCount !== 1 ? 's' : ''}` : 'Attach'}
           </button>
           ${showWeight ? `
-          <button class="step-weight-btn ${weight > 1 ? 'is-weighted' : ''} ${state.role !== 'admin' ? 'read-only' : ''}"
+          <button class="step-weight-btn ${weightClass} ${state.role !== 'admin' ? 'read-only' : ''}"
                   ${state.role === 'admin' ? `data-weight-step="${s.id}"` : ''}
-                  title="${state.role === 'admin' ? `Weight: ×${weight} — click to change` : `Weight: ×${weight}`}">
-            ×${weight}
+                  title="${state.role === 'admin' ? `Weight: ×${displayWeight} — click to change` : `Weight: ×${displayWeight}`}">
+            ×${displayWeight}
           </button>` : ''}
         </div>
       </div>`;
@@ -1093,6 +1119,7 @@ document.addEventListener('click', e => {
 document.getElementById('stage-list').addEventListener('click', e => {
   const item = e.target.closest('.stage-item');
   if (!item) return;
+  pendingWeightChange = null;
   const stageId = item.dataset.stage;
   if (stageId === '__cover__') {
     state.activeStageId = '__cover__';
@@ -1109,6 +1136,7 @@ document.getElementById('stage-list').addEventListener('click', e => {
 document.getElementById('condition-tabs').addEventListener('click', e => {
   const tab = e.target.closest('.cond-tab');
   if (!tab) return;
+  pendingWeightChange = null;
   state.activeCondId = tab.dataset.cond;
   render();
 });
@@ -1138,15 +1166,26 @@ document.getElementById('steps-grid').addEventListener('click', e => {
     return;
   }
 
-  // Weight badge (admin only)
+  // Weight badge (admin only) — stage a pending change for confirmation
   const weightBtn = e.target.closest('[data-weight-step]');
   if (weightBtn && state.role === 'admin') {
     e.stopPropagation();
     const dealType = state.cover?.dealType;
     if (!dealType) return;
     const stepId  = weightBtn.dataset.weightStep;
-    const current = getStepWeight(stepId);
-    setStepWeight(dealType, stepId, current >= 5 ? 1 : current + 1);
+    // If clicking the already-pending step, cycle the proposed weight further
+    const base      = pendingWeightChange?.stepId === stepId
+      ? pendingWeightChange.newWeight
+      : getStepWeight(stepId);
+    const newWeight = base >= 5 ? 1 : base + 1;
+    // Find step title for the banner
+    let stepTitle = stepId;
+    const stage = STAGES.find(s => s.id === state.activeStageId);
+    if (stage) {
+      const found = effectiveSteps(stage).find(x => x.id === stepId);
+      if (found) stepTitle = found.title;
+    }
+    pendingWeightChange = { stepId, stepTitle, dealType, newWeight };
     render();
     return;
   }
@@ -1333,6 +1372,22 @@ document.getElementById('comments-add-btn').addEventListener('click', () => {
   commentsQuill.setContents([]);
   renderCommentsModal();
   render();
+});
+
+// Weight confirmation banner
+document.getElementById('steps-weight-banner').addEventListener('click', e => {
+  if (e.target.closest('#steps-weight-confirm')) {
+    if (pendingWeightChange) {
+      setStepWeight(pendingWeightChange.dealType, pendingWeightChange.stepId, pendingWeightChange.newWeight);
+      pendingWeightChange = null;
+      render();
+    }
+    return;
+  }
+  if (e.target.closest('#steps-weight-cancel')) {
+    pendingWeightChange = null;
+    render();
+  }
 });
 
 // ── Attachments modal events ──────────────────────────
