@@ -852,7 +852,7 @@ function renderSteps(stage) {
   // Confirmation banner for pending weight change
   const wBanner = document.getElementById('steps-weight-banner');
   if (pendingWeightChange) {
-    const dtName    = pendingWeightChange.dealType === 'new-logo' ? 'New Logo' : 'Expansion / Upsell';
+    const dtName    = pendingWeightChange.dealType === 'new-logo' ? 'New Logo' : 'Expansion / Upsell / Renewal';
     const wLabel    = pendingWeightChange.newWeight === 1 ? '×1 (default)' : `×${pendingWeightChange.newWeight}`;
     wBanner.innerHTML = `
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex-shrink:0">
