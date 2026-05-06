@@ -6,6 +6,7 @@ const SK = {
   currentEmail: 'sph_current_email',
   users:        'sph_users',
   weights:      'sph_weights',
+  promptEdits:  'sph_prompt_edits',
   opp: id => ({
     used:         `sph_${id}_used`,
     added:        `sph_${id}_added`,
@@ -99,7 +100,8 @@ const initialOppId  = opps.find(o => o.id === savedActiveId) ? savedActiveId : o
 
 const storedUsers   = JSON.parse(localStorage.getItem(SK.users)   || '[]');
 const storedEmail   = localStorage.getItem(SK.currentEmail) || '';
-const storedWeights = JSON.parse(localStorage.getItem(SK.weights) || '{}');
+const storedWeights      = JSON.parse(localStorage.getItem(SK.weights)      || '{}');
+const storedPromptEdits  = JSON.parse(localStorage.getItem(SK.promptEdits)  || '{}');
 
 const state = {
   opps,
@@ -112,6 +114,7 @@ const state = {
   currentEmail:    storedEmail,
   role:            determineRole(storedEmail, storedUsers),
   weights:         storedWeights,
+  promptEdits:     storedPromptEdits,
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -216,6 +219,71 @@ function setStepWeight(dealType, stepId, weight) {
     state.weights[dealType][stepId] = weight;
   }
   saveWeights();
+}
+
+// ── Prompt edits (global) ─────────────────────────────
+
+function savePromptEdits() {
+  localStorage.setItem(SK.promptEdits, JSON.stringify(state.promptEdits));
+}
+
+// Merges a base prompt with any global admin edits
+function getEffectivePrompt(p) {
+  const edit = state.promptEdits[p.id] || {};
+  return {
+    id:          p.id,
+    title:       edit.title       !== undefined ? edit.title       : p.title,
+    explanation: edit.explanation !== undefined ? edit.explanation : '',
+    body:        edit.body        !== undefined ? edit.body        : (p.body || ''),
+  };
+}
+
+// Finds and returns the effective prompt for a given ID across all stages/conditions
+function getEffectivePromptById(id) {
+  for (const s of STAGES) {
+    for (const c of s.conditions) {
+      const all = [...c.prompts, ...state.added.filter(p => p.condId === c.id)];
+      const found = all.find(p => p.id === id);
+      if (found) return getEffectivePrompt(found);
+    }
+  }
+  return { id, title: '', explanation: '', body: '' };
+}
+
+// ── Prompt edit modal (admin) ─────────────────────────
+
+let editingPromptId = null;
+
+function openPromptEditModal(id) {
+  editingPromptId = id;
+  const ep = getEffectivePromptById(id);
+  document.getElementById('prompt-edit-name').value = ep.title;
+  document.getElementById('prompt-edit-desc').value = ep.explanation;
+  document.getElementById('prompt-edit-text').value = ep.body;
+  document.getElementById('prompt-edit-name').classList.remove('error');
+  document.getElementById('prompt-edit-overlay').classList.remove('hidden');
+  document.getElementById('prompt-edit-name').focus();
+}
+
+function closePromptEditModal() {
+  document.getElementById('prompt-edit-overlay').classList.add('hidden');
+  editingPromptId = null;
+}
+
+function savePromptEdit() {
+  if (!editingPromptId) return;
+  const nameEl = document.getElementById('prompt-edit-name');
+  const title  = nameEl.value.trim();
+  if (!title) { nameEl.classList.add('error'); nameEl.focus(); return; }
+  nameEl.classList.remove('error');
+  state.promptEdits[editingPromptId] = {
+    title,
+    explanation: document.getElementById('prompt-edit-desc').value.trim(),
+    body:        document.getElementById('prompt-edit-text').value,
+  };
+  savePromptEdits();
+  closePromptEditModal();
+  render();
 }
 
 // ── Email gate ────────────────────────────────────────
@@ -730,12 +798,19 @@ function renderPrompts(stage) {
   banner.textContent = cond.description;
   banner.style.setProperty('--banner-color', stage.color);
 
+  const isAdmin = state.role === 'admin';
   const cards = effectivePrompts(cond).map(p => {
-    const used = state.used.has(p.id);
-    const bodyText  = p.body || 'No prompt added yet — click to add one here.';
-    const bodyClass = p.body ? 'has-content' : '';
+    const ep      = getEffectivePrompt(p);
+    const used    = state.used.has(p.id);
+    const hasCopy = !isAdmin && !!ep.body;
+    const cardCls = isAdmin ? 'prompt-editable' : hasCopy ? 'prompt-copyable' : '';
+    const bodyEl  = ep.explanation
+      ? `<div class="prompt-body has-content">${escHtml(ep.explanation)}</div>`
+      : isAdmin
+        ? `<div class="prompt-body prompt-no-desc">No description yet — click to edit.</div>`
+        : '';
     return `
-      <div class="prompt-card ${used ? 'used' : ''}" data-prompt="${p.id}">
+      <div class="prompt-card ${used ? 'used' : ''} ${cardCls}" data-prompt="${p.id}">
         <div class="prompt-card-top">
           <div class="prompt-check">
             <svg class="check-icon" viewBox="0 0 11 11" fill="none">
@@ -743,11 +818,26 @@ function renderPrompts(stage) {
                     stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <span class="prompt-title">${escHtml(p.title)}</span>
+          <span class="prompt-title">${escHtml(ep.title)}</span>
+          ${hasCopy ? `
+          <span class="prompt-copy-badge" title="Click to copy prompt to clipboard">
+            <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
+              <rect x="4.5" y="1" width="7.5" height="9" rx="1.2" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M2.5 3.5H2A.75.75 0 001.25 4.25v7A.75.75 0 002 12h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            Copy
+          </span>` : ''}
+          ${isAdmin ? `
+          <span class="prompt-edit-badge" title="Click to edit this prompt">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+              <path d="M8.5 1.5L10.5 3.5L3.5 10.5H1.5V8.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+            Edit
+          </span>` : ''}
         </div>
-        <div class="prompt-body ${bodyClass}">${escHtml(bodyText)}</div>
+        ${bodyEl}
         <span class="used-pill">✓ Used</span>
-        ${state.role === 'admin' ? `
+        ${isAdmin ? `
         <button class="prompt-delete-btn" data-delete-prompt="${p.id}" title="Remove prompt">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
@@ -1152,9 +1242,38 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
   const card = e.target.closest('.prompt-card');
   if (!card) return;
   const id = card.dataset.prompt;
-  if (state.used.has(id)) state.used.delete(id); else state.used.add(id);
-  saveCurrentOpp();
+
+  if (state.role === 'admin') {
+    // Checkbox or "✓ Used" pill → toggle used state
+    if (e.target.closest('.prompt-check') || e.target.closest('.used-pill')) {
+      if (state.used.has(id)) state.used.delete(id); else state.used.add(id);
+      saveCurrentOpp();
+      render();
+    } else {
+      // Anywhere else on card → open edit modal
+      openPromptEditModal(id);
+    }
+    return;
+  }
+
+  // Standard user: copy body to clipboard, mark as used, flash "Copied!"
+  const ep = getEffectivePromptById(id);
+  if (ep.body) {
+    navigator.clipboard.writeText(ep.body).catch(() => {});
+  }
+  if (!state.used.has(id)) {
+    state.used.add(id);
+    saveCurrentOpp();
+  }
   render();
+  // Flash "Copied!" overlay on the freshly rendered card
+  if (ep.body) {
+    const freshCard = document.querySelector(`[data-prompt="${id}"]`);
+    if (freshCard) {
+      freshCard.classList.add('prompt-copied');
+      setTimeout(() => freshCard.classList.remove('prompt-copied'), 1300);
+    }
+  }
 });
 
 // Steps grid
@@ -1262,6 +1381,17 @@ document.getElementById('cover-stages-grid').addEventListener('click', e => {
   render();
 });
 
+// Prompt edit modal
+document.getElementById('prompt-edit-close').addEventListener('click', closePromptEditModal);
+document.getElementById('prompt-edit-cancel').addEventListener('click', closePromptEditModal);
+document.getElementById('prompt-edit-save').addEventListener('click', savePromptEdit);
+document.getElementById('prompt-edit-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('prompt-edit-overlay')) closePromptEditModal();
+});
+document.getElementById('prompt-edit-name').addEventListener('input', () => {
+  document.getElementById('prompt-edit-name').classList.remove('error');
+});
+
 // Modal controls
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
@@ -1343,6 +1473,7 @@ document.getElementById('users-list').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
+  if (!document.getElementById('prompt-edit-overlay').classList.contains('hidden'))  { closePromptEditModal(); return; }
   if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }
   if (!document.getElementById('comments-overlay').classList.contains('hidden'))    { closeCommentsModal(); return; }
   if (!document.getElementById('users-overlay').classList.contains('hidden'))       { closeUsersModal(); return; }

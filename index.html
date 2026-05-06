@@ -179,6 +179,35 @@
     </div>
   </div>
 
+  <!-- Prompt Edit Modal (admin only) -->
+  <div id="prompt-edit-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div id="prompt-edit-modal">
+      <div id="prompt-edit-header">
+        <h2 id="prompt-edit-title-label">Edit Prompt</h2>
+        <button id="prompt-edit-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="prompt-edit-warning">
+        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" style="flex-shrink:0;margin-top:1px">
+          <path d="M7.5 1.5L13.5 12.5H1.5L7.5 1.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M7.5 5.5v3M7.5 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Changes to this prompt apply <strong>globally</strong> to all users and all deals.
+      </div>
+      <div id="prompt-edit-form">
+        <label for="prompt-edit-name">Prompt Name <span class="required">*</span></label>
+        <input id="prompt-edit-name" type="text" placeholder="e.g. ICP Fit Analysis" autocomplete="off" />
+        <label for="prompt-edit-desc">Description <span class="optional">(what this prompt is designed to do)</span></label>
+        <textarea id="prompt-edit-desc" rows="3" placeholder="Briefly explain the goal of this prompt so users know when to use it…"></textarea>
+        <label for="prompt-edit-text">Prompt Text <span class="optional">(pasted into the LLM by the user)</span></label>
+        <textarea id="prompt-edit-text" rows="10" placeholder="Paste the full LLM prompt here…"></textarea>
+      </div>
+      <div id="prompt-edit-footer">
+        <button id="prompt-edit-cancel" class="btn-secondary">Cancel</button>
+        <button id="prompt-edit-save" class="btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Confirm Modal -->
   <div id="delete-overlay" class="hidden" role="dialog" aria-modal="true">
     <div id="delete-modal">
