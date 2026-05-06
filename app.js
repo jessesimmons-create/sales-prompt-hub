@@ -747,7 +747,7 @@ function renderTabs(stage) {
     return `
       <div class="cond-tab ${c.id === state.activeCondId ? 'active' : ''}"
            style="--active-color:${stage.color}" data-cond="${c.id}">
-        ${c.name}
+        ${c.name} Prompts
       </div>`;
   }).join('');
 
@@ -755,13 +755,13 @@ function renderTabs(stage) {
   const pct       = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
   const stepState = pct === 100 ? 'complete' : pct > 0 ? 'in-progress' : '';
 
-  document.getElementById('condition-tabs').innerHTML = condTabs + `
-    <div class="steps-tab-divider"></div>
+  document.getElementById('condition-tabs').innerHTML = `
     <div class="cond-tab steps-tab ${state.activeCondId === '__steps__' ? 'active' : ''} ${stepState}"
          style="--active-color:${stage.color}" data-cond="__steps__">
       Steps
       <span class="steps-tab-pct">${pct}%</span>
-    </div>`;
+    </div>
+    <div class="steps-tab-divider"></div>` + condTabs;
 }
 
 // ── Render: Prompts ───────────────────────────────────
