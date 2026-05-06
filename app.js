@@ -711,7 +711,7 @@ function renderSidebar() {
         <div class="stage-item-row">
           <span class="stage-icon">${s.icon}</span>
           <span class="stage-name">${s.name}</span>
-          <span class="stage-badge">${pct > 0 ? pct + '%' : ''}</span>
+          <span class="stage-badge" style="color:${pctColor(pct)}">${pct > 0 ? pct + '%' : ''}</span>
           <span class="stage-check">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
               <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" stroke-width="1.6"
@@ -759,7 +759,7 @@ function renderTabs(stage) {
     <div class="cond-tab steps-tab ${state.activeCondId === '__steps__' ? 'active' : ''} ${stepState}"
          style="--active-color:${stage.color}" data-cond="__steps__">
       Steps
-      <span class="steps-tab-pct">${pct}%</span>
+      <span class="steps-tab-pct" style="color:${pct > 0 ? pctColor(pct) : ''}">${pct}%</span>
     </div>
     <div class="steps-tab-divider"></div>` + condTabs;
 }
@@ -846,7 +846,7 @@ function renderSteps(stage) {
     ? `${weightedUsed} of ${weightedTotal} points`
     : `${used} of ${total} steps completed`;
   document.getElementById('steps-pct-label').textContent       = `${pct}%`;
-  document.getElementById('steps-pct-label').style.color       = stage.color;
+  document.getElementById('steps-pct-label').style.color       = pct > 0 ? pctColor(pct) : stage.color;
   document.getElementById('steps-progress-fill').style.cssText = `width:${pct}%;background:${stage.color}`;
 
   // Confirmation banner for pending weight change
@@ -1678,6 +1678,12 @@ commentsQuill.root.addEventListener('keydown', e => {
 });
 
 // ── Helpers ───────────────────────────────────────────
+
+function pctColor(pct) {
+  if (pct >= 81) return '#22c55e';
+  if (pct >= 41) return '#f59e0b';
+  return '#ef4444';
+}
 
 function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
