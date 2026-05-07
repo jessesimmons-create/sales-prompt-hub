@@ -1485,7 +1485,6 @@ body {
 #prompt-edit-form label:first-child { margin-top: 0; }
 
 #prompt-edit-name,
-#prompt-edit-desc,
 #prompt-edit-text {
   width: 100%;
   padding: 9px 12px;
@@ -1501,11 +1500,38 @@ body {
 }
 
 #prompt-edit-name:focus,
-#prompt-edit-desc:focus,
 #prompt-edit-text:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
   background: #fff;
+}
+
+/* Quill editor inside prompt-edit-desc */
+#prompt-edit-desc-editor .ql-toolbar {
+  border: 1.5px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #f8fafc;
+  padding: 5px 8px;
+}
+#prompt-edit-desc-editor .ql-container {
+  border: 1.5px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  font-family: inherit;
+  font-size: 13.5px;
+}
+#prompt-edit-desc-editor .ql-editor {
+  min-height: 70px;
+  padding: 9px 12px;
+  color: var(--text);
+}
+#prompt-edit-desc-editor:focus-within .ql-toolbar,
+#prompt-edit-desc-editor:focus-within .ql-container {
+  border-color: #6366f1;
+}
+#prompt-edit-desc-editor:focus-within .ql-toolbar {
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  box-shadow: inset 0 0 0 0, 0 0 0 3px rgba(99,102,241,0.1);
 }
 
 #prompt-edit-name.error {
@@ -2383,6 +2409,44 @@ body {
 }
 
 .modal-error-msg { font-size: 11px; color: #ef4444; margin-top: 2px; display: none; }
+
+#modal-input-body.hidden { display: none; }
+
+/* Quill editor inside step body field */
+#modal-step-body-editor.hidden { display: none; }
+#modal-step-body-editor .ql-toolbar {
+  border: 1.5px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #f8fafc;
+  padding: 5px 8px;
+}
+#modal-step-body-editor .ql-container {
+  border: 1.5px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  font-family: inherit;
+  font-size: 14px;
+}
+#modal-step-body-editor .ql-editor {
+  min-height: 120px;
+  padding: 10px 12px;
+  color: var(--text);
+}
+#modal-step-body-editor:focus-within .ql-toolbar,
+#modal-step-body-editor:focus-within .ql-container {
+  border-color: var(--modal-accent, #6366f1);
+}
+
+/* Rich text rendered on cards */
+.ql-content { font-size: inherit; line-height: 1.55; }
+.ql-content p { margin: 0 0 4px; }
+.ql-content p:last-child { margin-bottom: 0; }
+.ql-content strong { font-weight: 600; }
+.ql-content em { font-style: italic; }
+.ql-content u { text-decoration: underline; }
+.ql-content a { color: #6366f1; text-decoration: underline; }
+.ql-content ul, .ql-content ol { padding-left: 18px; margin: 4px 0; }
+.ql-content li { margin: 2px 0; }
 .modal-error-msg.visible { display: block; }
 
 #modal-footer {

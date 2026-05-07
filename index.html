@@ -161,11 +161,12 @@
         </label>
         <input id="modal-input-title" type="text" placeholder="e.g. ICP Fit Analysis" autocomplete="off" />
         <div id="modal-body-section">
-          <label for="modal-input-body">
+          <label>
             <span id="modal-body-label">Prompt Text</span>
             <span class="optional">(optional — add now or later)</span>
           </label>
           <textarea id="modal-input-body" rows="7" placeholder="Paste your LLM prompt here…"></textarea>
+          <div id="modal-step-body-editor" class="hidden"></div>
         </div>
       </div>
       <div id="modal-footer">
@@ -192,8 +193,8 @@
       <div id="prompt-edit-form">
         <label for="prompt-edit-name">Prompt Name <span class="required">*</span></label>
         <input id="prompt-edit-name" type="text" placeholder="e.g. ICP Fit Analysis" autocomplete="off" />
-        <label for="prompt-edit-desc">Description <span class="optional">(what this prompt is designed to do)</span></label>
-        <textarea id="prompt-edit-desc" rows="3" placeholder="Briefly explain the goal of this prompt so users know when to use it…"></textarea>
+        <label>Description <span class="optional">(what this prompt is designed to do)</span></label>
+        <div id="prompt-edit-desc-editor"></div>
         <label for="prompt-edit-text">Prompt Text <span class="optional">(pasted into the LLM by the user)</span></label>
         <textarea id="prompt-edit-text" rows="10" placeholder="Paste the full LLM prompt here…"></textarea>
       </div>

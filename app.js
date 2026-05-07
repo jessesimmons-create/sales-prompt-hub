@@ -279,7 +279,8 @@ function openPromptEditModal(id) {
   editingPromptId = id;
   const ep = getEffectivePromptById(id);
   document.getElementById('prompt-edit-name').value = ep.title;
-  document.getElementById('prompt-edit-desc').value = ep.explanation;
+  if (ep.explanation) promptEditDescQuill.clipboard.dangerouslyPasteHTML(ep.explanation);
+  else promptEditDescQuill.setContents([]);
   document.getElementById('prompt-edit-text').value = ep.body;
   document.getElementById('prompt-edit-name').classList.remove('error');
   document.getElementById('prompt-edit-overlay').classList.remove('hidden');
@@ -289,6 +290,7 @@ function openPromptEditModal(id) {
 function closePromptEditModal() {
   document.getElementById('prompt-edit-overlay').classList.add('hidden');
   editingPromptId = null;
+  promptEditDescQuill.setContents([]);
 }
 
 function savePromptEdit() {
@@ -299,7 +301,7 @@ function savePromptEdit() {
   nameEl.classList.remove('error');
   state.promptEdits[editingPromptId] = {
     title,
-    explanation: document.getElementById('prompt-edit-desc').value.trim(),
+    explanation: quillToHtml(promptEditDescQuill),
     body:        document.getElementById('prompt-edit-text').value,
   };
   savePromptEdits();
@@ -802,7 +804,7 @@ function renderPrompts(stage) {
     const hasCopy = !isAdmin && !!ep.body;
     const cardCls = isAdmin ? 'prompt-editable' : hasCopy ? 'prompt-copyable' : '';
     const bodyEl  = ep.explanation
-      ? `<div class="prompt-body has-content">${escHtml(ep.explanation)}</div>`
+      ? `<div class="prompt-body has-content ql-content">${ep.explanation}</div>`
       : isAdmin
         ? `<div class="prompt-body prompt-no-desc">No description yet — click to edit.</div>`
         : '';
@@ -909,6 +911,9 @@ function renderSteps(stage) {
     const displayWeight = isPending ? pendingWeightChange.newWeight : weight;
     const showWeight    = !!dealType && (state.role === 'admin' || weight > 1 || isPending);
     const weightClass   = isPending ? 'is-pending' : (weight > 1 ? 'is-weighted' : '');
+    const stepBodyEl = es.body
+      ? `<div class="prompt-body has-content ql-content">${es.body}</div>`
+      : '';
     return `
       <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
         <div class="prompt-card-top">
@@ -920,6 +925,7 @@ function renderSteps(stage) {
           </div>
           <span class="prompt-title">${escHtml(es.title)}</span>
         </div>
+        ${stepBodyEl}
         <span class="used-pill">✓ Done</span>
         ${state.role === 'admin' ? `
         <button class="step-edit-btn" data-edit-step="${s.id}" title="Edit step">
@@ -1111,13 +1117,19 @@ function openModal(type, targetId) {
 
   document.getElementById('modal-body-section').classList.toggle('hidden', isOpp);
 
+  const isStepLike = isStep || isStepEdit;
+  document.getElementById('modal-input-body').classList.toggle('hidden', isStepLike);
+  document.getElementById('modal-step-body-editor').classList.toggle('hidden', !isStepLike);
+
   if (isStepEdit) {
     const es = getEffectiveStepById(targetId);
     document.getElementById('modal-input-title').value = es.title;
-    document.getElementById('modal-input-body').value  = es.body;
+    if (es.body) stepBodyQuill.clipboard.dangerouslyPasteHTML(es.body);
+    else stepBodyQuill.setContents([]);
   } else {
     document.getElementById('modal-input-title').value = '';
-    document.getElementById('modal-input-body').value  = '';
+    if (isStepLike) stepBodyQuill.setContents([]);
+    else document.getElementById('modal-input-body').value = '';
   }
   document.getElementById('modal-input-title').classList.remove('error');
   document.querySelector('.modal-error-msg')?.classList.remove('visible');
@@ -1134,6 +1146,7 @@ function openModal(type, targetId) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
   modal = { type: null, targetId: null };
+  stepBodyQuill.setContents([]);
 }
 
 function saveItem() {
@@ -1153,16 +1166,18 @@ function saveItem() {
     return;
   }
 
+  const isStepLike = modal.type === 'step' || modal.type === 'step-edit';
+  const body = isStepLike
+    ? quillToHtml(stepBodyQuill)
+    : document.getElementById('modal-input-body').value.trim();
+
   if (modal.type === 'step-edit') {
-    const body = document.getElementById('modal-input-body').value.trim();
     state.stepEdits[modal.targetId] = { title, body };
     saveStepEdits();
     closeModal();
     render();
     return;
   }
-
-  const body = document.getElementById('modal-input-body').value.trim();
   const id   = (modal.type === 'step' ? 'step_' : 'prompt_') +
                Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 
@@ -1686,6 +1701,25 @@ document.getElementById('attachments-file-add').addEventListener('click', () => 
 
 // ── Quill rich text editor ────────────────────────────
 
+const QUILL_TOOLBAR = [
+  ['bold', 'italic', 'underline'],
+  ['link'],
+  [{ list: 'bullet' }, { list: 'ordered' }],
+  ['clean'],
+];
+
+const stepBodyQuill = new Quill('#modal-step-body-editor', {
+  theme: 'snow',
+  placeholder: 'Optional description or instructions…',
+  modules: { toolbar: QUILL_TOOLBAR },
+});
+
+const promptEditDescQuill = new Quill('#prompt-edit-desc-editor', {
+  theme: 'snow',
+  placeholder: 'Briefly explain the goal of this prompt so users know when to use it…',
+  modules: { toolbar: QUILL_TOOLBAR },
+});
+
 const commentsQuill = new Quill('#comments-editor', {
   theme: 'snow',
   placeholder: 'Write a comment…',
@@ -1722,6 +1756,10 @@ commentsQuill.root.addEventListener('keydown', e => {
 });
 
 // ── Helpers ───────────────────────────────────────────
+
+function quillToHtml(q) {
+  return q.getText().trim() ? q.root.innerHTML : '';
+}
 
 function pctColor(pct) {
   if (pct >= 81) return '#22c55e';
