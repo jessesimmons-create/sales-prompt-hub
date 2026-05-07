@@ -7,6 +7,7 @@ const SK = {
   users:        'sph_users',
   weights:      'sph_weights',
   promptEdits:  'sph_prompt_edits',
+  stepEdits:    'sph_step_edits',
   opp: id => ({
     added:        `sph_${id}_added`,
     removed:      `sph_${id}_removed`,
@@ -98,6 +99,7 @@ const storedUsers   = JSON.parse(localStorage.getItem(SK.users)   || '[]');
 const storedEmail   = localStorage.getItem(SK.currentEmail) || '';
 const storedWeights      = JSON.parse(localStorage.getItem(SK.weights)      || '{}');
 const storedPromptEdits  = JSON.parse(localStorage.getItem(SK.promptEdits)  || '{}');
+const storedStepEdits    = JSON.parse(localStorage.getItem(SK.stepEdits)    || '{}');
 
 const state = {
   opps,
@@ -111,6 +113,7 @@ const state = {
   role:            determineRole(storedEmail, storedUsers),
   weights:         storedWeights,
   promptEdits:     storedPromptEdits,
+  stepEdits:       storedStepEdits,
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -243,6 +246,29 @@ function getEffectivePromptById(id) {
     }
   }
   return { id, title: '', explanation: '', body: '' };
+}
+
+// ── Step edits (global) ───────────────────────────────
+
+function saveStepEdits() {
+  localStorage.setItem(SK.stepEdits, JSON.stringify(state.stepEdits));
+}
+
+function getEffectiveStep(s) {
+  const edit = state.stepEdits[s.id] || {};
+  return {
+    id:    s.id,
+    title: edit.title !== undefined ? edit.title : s.title,
+    body:  edit.body  !== undefined ? edit.body  : (s.body || ''),
+  };
+}
+
+function getEffectiveStepById(id) {
+  for (const s of STAGES) {
+    const found = effectiveSteps(s).find(x => x.id === id);
+    if (found) return getEffectiveStep(found);
+  }
+  return { id, title: '', body: '' };
 }
 
 // ── Prompt edit modal (admin) ─────────────────────────
@@ -404,11 +430,7 @@ function formatCommentDate(ts) {
 
 function openCommentsModal(stepId) {
   commentsStepId = stepId;
-  let stepTitle = stepId;
-  for (const s of STAGES) {
-    const found = effectiveSteps(s).find(x => x.id === stepId);
-    if (found) { stepTitle = found.title; break; }
-  }
+  const stepTitle = getEffectiveStepById(stepId).title || stepId;
   document.getElementById('comments-modal-step-name').textContent = stepTitle;
   renderCommentsModal();
   document.getElementById('comments-overlay').classList.remove('hidden');
@@ -470,11 +492,7 @@ function removeAttachment(id) {
 function openAttachmentsModal(stepId) {
   attachmentsStepId  = stepId;
   attachmentsPending = null;
-  let stepTitle = stepId;
-  for (const s of STAGES) {
-    const found = effectiveSteps(s).find(x => x.id === stepId);
-    if (found) { stepTitle = found.title; break; }
-  }
+  const stepTitle = getEffectiveStepById(stepId).title || stepId;
   document.getElementById('attachments-modal-step-name').textContent = stepTitle;
   setAttachmentsTab('link');
   document.getElementById('attachments-link-url').value  = '';
@@ -882,6 +900,7 @@ function renderSteps(stage) {
     </div>` : '';
 
   const cards = steps.map(s => {
+    const es           = getEffectiveStep(s);
     const done         = state.stepsUsed.has(s.id);
     const commentCount = state.comments.filter(c => c.stepId === s.id).length;
     const attachCount  = state.attachments.filter(a => a.stepId === s.id).length;
@@ -899,10 +918,15 @@ function renderSteps(stage) {
                     stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <span class="prompt-title">${escHtml(s.title)}</span>
+          <span class="prompt-title">${escHtml(es.title)}</span>
         </div>
         <span class="used-pill">✓ Done</span>
         ${state.role === 'admin' ? `
+        <button class="step-edit-btn" data-edit-step="${s.id}" title="Edit step">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M8.5 1.5L10.5 3.5L3.5 10.5H1.5V8.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+          </svg>
+        </button>
         <button class="prompt-delete-btn" data-delete-step="${s.id}" title="Remove step">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
@@ -1064,29 +1088,37 @@ let modal = { type: null, targetId: null };
 function openModal(type, targetId) {
   modal = { type, targetId };
 
-  const isOpp  = type === 'opportunity';
-  const isStep = type === 'step';
-  const stage  = isStep
-    ? STAGES.find(s => s.id === targetId)
+  const isOpp      = type === 'opportunity';
+  const isStep     = type === 'step';
+  const isStepEdit = type === 'step-edit';
+  const stage  = (isStep || isStepEdit)
+    ? STAGES.find(s => s.id === targetId) ||
+      STAGES.find(s => effectiveSteps(s).some(x => x.id === targetId))
     : isOpp ? null
     : STAGES.find(s => s.conditions.some(c => c.id === targetId));
   const accent = stage?.color || '#6366f1';
 
-  document.getElementById('modal-title').textContent       = isOpp  ? 'New Opportunity' : isStep ? 'Add Step'   : 'Add Prompt';
-  document.getElementById('modal-save').textContent        = isOpp  ? 'Create'           : isStep ? 'Add Step'   : 'Add Prompt';
-  document.getElementById('modal-title-label').textContent = isOpp  ? 'Name'             : 'Title';
-  document.getElementById('modal-body-label').textContent  = isStep ? 'Description'      : 'Prompt Text';
+  document.getElementById('modal-title').textContent       = isOpp ? 'New Opportunity' : isStepEdit ? 'Edit Step' : isStep ? 'Add Step' : 'Add Prompt';
+  document.getElementById('modal-save').textContent        = isOpp ? 'Create' : isStepEdit ? 'Save Changes' : isStep ? 'Add Step' : 'Add Prompt';
+  document.getElementById('modal-title-label').textContent = isOpp ? 'Name' : 'Title';
+  document.getElementById('modal-body-label').textContent  = (isStep || isStepEdit) ? 'Description' : 'Prompt Text';
   document.getElementById('modal-input-title').placeholder = isOpp
     ? 'e.g. Acme Corp — Q3 2026'
-    : isStep ? 'e.g. Confirm attendees and roles' : 'e.g. ICP Fit Analysis';
-  document.getElementById('modal-input-body').placeholder  = isStep
+    : (isStep || isStepEdit) ? 'e.g. Confirm attendees and roles' : 'e.g. ICP Fit Analysis';
+  document.getElementById('modal-input-body').placeholder  = (isStep || isStepEdit)
     ? 'Optional details or instructions…'
     : 'Paste your LLM prompt here…';
 
   document.getElementById('modal-body-section').classList.toggle('hidden', isOpp);
 
-  document.getElementById('modal-input-title').value = '';
-  document.getElementById('modal-input-body').value  = '';
+  if (isStepEdit) {
+    const es = getEffectiveStepById(targetId);
+    document.getElementById('modal-input-title').value = es.title;
+    document.getElementById('modal-input-body').value  = es.body;
+  } else {
+    document.getElementById('modal-input-title').value = '';
+    document.getElementById('modal-input-body').value  = '';
+  }
   document.getElementById('modal-input-title').classList.remove('error');
   document.querySelector('.modal-error-msg')?.classList.remove('visible');
 
@@ -1118,6 +1150,15 @@ function saveItem() {
   if (modal.type === 'opportunity') {
     closeModal();
     createOpp(title);
+    return;
+  }
+
+  if (modal.type === 'step-edit') {
+    const body = document.getElementById('modal-input-body').value.trim();
+    state.stepEdits[modal.targetId] = { title, body };
+    saveStepEdits();
+    closeModal();
+    render();
     return;
   }
 
@@ -1316,6 +1357,9 @@ document.getElementById('steps-grid').addEventListener('click', e => {
 
   const commentBtn = e.target.closest('[data-comments-step]');
   if (commentBtn) { openCommentsModal(commentBtn.dataset.commentsStep); return; }
+
+  const editBtn = e.target.closest('[data-edit-step]');
+  if (editBtn) { e.stopPropagation(); openModal('step-edit', editBtn.dataset.editStep); return; }
 
   const delBtn = e.target.closest('[data-delete-step]');
   if (delBtn) { e.stopPropagation(); openDeleteModal('step', delBtn.dataset.deleteStep); return; }
