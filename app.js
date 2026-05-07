@@ -911,9 +911,6 @@ function renderSteps(stage) {
     const displayWeight = isPending ? pendingWeightChange.newWeight : weight;
     const showWeight    = !!dealType && (state.role === 'admin' || weight > 1 || isPending);
     const weightClass   = isPending ? 'is-pending' : (weight > 1 ? 'is-weighted' : '');
-    const stepBodyEl = es.body
-      ? `<div class="prompt-body has-content ql-content">${es.body}</div>`
-      : '';
     return `
       <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
         <div class="prompt-card-top">
@@ -924,15 +921,21 @@ function renderSteps(stage) {
             </svg>
           </div>
           <span class="prompt-title">${escHtml(es.title)}</span>
+          ${commentCount > 0 ? `
+          <span class="step-mini-badge" data-comments-step="${s.id}" title="${commentCount} comment${commentCount !== 1 ? 's' : ''}">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+              <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+            </svg>${commentCount}
+          </span>` : ''}
+          ${attachCount > 0 ? `
+          <span class="step-mini-badge atch-badge" data-attachments-step="${s.id}" title="${attachCount} file${attachCount !== 1 ? 's' : ''}">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+              <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>${attachCount}
+          </span>` : ''}
         </div>
-        ${stepBodyEl}
         <span class="used-pill">✓ Done</span>
         ${state.role === 'admin' ? `
-        <button class="step-edit-btn" data-edit-step="${s.id}" title="Edit step">
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-            <path d="M8.5 1.5L10.5 3.5L3.5 10.5H1.5V8.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-          </svg>
-        </button>
         <button class="prompt-delete-btn" data-delete-step="${s.id}" title="Remove step">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
@@ -1044,6 +1047,15 @@ function renderCover() {
   document.getElementById('cover-deal-value').value = c.dealValue        || '';
   document.getElementById('cover-close-date').value = c.closeDate        || '';
   document.getElementById('cover-notes').value      = c.notes            || '';
+  document.getElementById('cover-prep-doc').value   = c.prepDoc          || '';
+  const prepDocLink = document.getElementById('cover-prep-doc-link');
+  const prepDocVal  = c.prepDoc?.trim();
+  if (prepDocVal) {
+    prepDocLink.href = prepDocVal.startsWith('http') ? prepDocVal : 'https://' + prepDocVal;
+    prepDocLink.classList.remove('hidden');
+  } else {
+    prepDocLink.classList.add('hidden');
+  }
 
   const userEmails = state.users.map(u => u.email);
   renderCoverUserSelect('cover-sales-engineer',      'salesEngineer',      userEmails, c.salesEngineer      || '');
@@ -1139,12 +1151,14 @@ function openModal(type, targetId) {
    document.getElementById('modal-input-body')].forEach(el =>
      el.style.setProperty('--modal-accent', accent));
 
+  document.getElementById('modal-step-warning').classList.toggle('hidden', type !== 'step-edit');
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('modal-input-title').focus();
 }
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
+  document.getElementById('modal-step-warning').classList.add('hidden');
   modal = { type: null, targetId: null };
   stepBodyQuill.setContents([]);
 }
@@ -1203,7 +1217,7 @@ function openDeleteModal(type, id) {
   if (type === 'step') {
     for (const s of STAGES) {
       const found = effectiveSteps(s).find(x => x.id === id);
-      if (found) { title = found.title; break; }
+      if (found) { title = getEffectiveStep(found).title; break; }
     }
     document.getElementById('delete-title').textContent = 'Remove step?';
     document.getElementById('delete-desc').innerHTML  =
@@ -1242,6 +1256,182 @@ function confirmDelete() {
   saveCurrentOpp();
   closeDeleteModal();
   render();
+}
+
+// ── Card Detail Modal ─────────────────────────────────
+
+let cardDetail = { type: null, id: null };
+
+function openCardDetail(type, id) {
+  cardDetail = { type, id };
+  renderCardDetail();
+  document.getElementById('card-detail-overlay').classList.remove('hidden');
+}
+
+function closeCardDetail() {
+  document.getElementById('card-detail-overlay').classList.add('hidden');
+  cardDetail = { type: null, id: null };
+}
+
+function renderCardDetail() {
+  const { type, id } = cardDetail;
+  if (!id) return;
+  const isAdmin = state.role === 'admin';
+
+  if (type === 'prompt') {
+    const ep = getEffectivePromptById(id);
+
+    // Header
+    document.getElementById('card-detail-header').innerHTML =
+      `<h2 class="cd-title">${escHtml(ep.title)}</h2>`;
+
+    // Body
+    let bodyHtml = '';
+    if (ep.explanation) {
+      bodyHtml += `<div class="cd-section">
+        <div class="cd-section-label">Description</div>
+        <div class="cd-desc ql-content">${ep.explanation}</div>
+      </div>`;
+    }
+    if (ep.body) {
+      bodyHtml += `<div class="cd-section">
+        <div class="cd-section-label">Prompt Text</div>
+        <div class="cd-prompt-text">${escHtml(ep.body)}</div>
+      </div>`;
+    }
+    if (!ep.explanation && !ep.body) {
+      bodyHtml = isAdmin
+        ? `<p class="cd-empty">No description or prompt text yet — click <strong>Edit</strong> to add.</p>`
+        : `<p class="cd-empty">No content added yet.</p>`;
+    }
+    document.getElementById('card-detail-body').innerHTML = bodyHtml;
+
+    // Footer
+    let footerHtml = '';
+    if (ep.body) {
+      footerHtml += `<button class="cd-btn primary" id="cd-copy-btn">
+        <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+          <rect x="4.5" y="1" width="7.5" height="9" rx="1.2" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M2.5 3.5H2A.75.75 0 001.25 4.25v7A.75.75 0 002 12h6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>Copy Prompt
+      </button>`;
+    }
+    if (isAdmin) {
+      footerHtml += `<span class="cd-spacer"></span>
+        <button class="cd-btn" id="cd-edit-btn">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M8.5 1.5L10.5 3.5L3.5 10.5H1.5V8.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+          </svg>Edit
+        </button>
+        <button class="cd-btn danger" id="cd-delete-btn">Delete</button>`;
+    }
+    document.getElementById('card-detail-footer').innerHTML = footerHtml;
+
+    document.getElementById('cd-copy-btn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(ep.body).catch(() => {});
+      const btn = document.getElementById('cd-copy-btn');
+      if (btn) {
+        const orig = btn.innerHTML;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
+      }
+    });
+    document.getElementById('cd-edit-btn')?.addEventListener('click', () => {
+      closeCardDetail(); openPromptEditModal(id);
+    });
+    document.getElementById('cd-delete-btn')?.addEventListener('click', () => {
+      closeCardDetail(); openDeleteModal('prompt', id);
+    });
+
+  } else if (type === 'step') {
+    const es           = getEffectiveStepById(id);
+    const done         = state.stepsUsed.has(id);
+    const commentCount = state.comments.filter(c => c.stepId === id).length;
+    const attachCount  = state.attachments.filter(a => a.stepId === id).length;
+    const dealType     = state.cover?.dealType;
+    const weight       = getStepWeight(id);
+    const showWeight   = !!dealType && (isAdmin || weight > 1);
+
+    // Header
+    document.getElementById('card-detail-header').innerHTML = `
+      <div class="cd-step-title-row">
+        <div class="cd-check ${done ? 'done' : ''}" id="cd-step-check">
+          <svg viewBox="0 0 11 11" fill="none" style="width:11px;height:11px">
+            <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h2 class="cd-title">${escHtml(es.title)}</h2>
+        ${done ? '<span class="cd-done-pill">✓ Done</span>' : ''}
+      </div>`;
+
+    // Body
+    let bodyHtml = '';
+    if (es.body) {
+      bodyHtml += `<div class="cd-section">
+        <div class="cd-section-label">Description</div>
+        <div class="cd-desc ql-content">${es.body}</div>
+      </div>`;
+    }
+    if (!es.body) {
+      bodyHtml = isAdmin
+        ? `<p class="cd-empty">No description yet — click <strong>Edit</strong> to add one.</p>`
+        : `<p class="cd-empty">No description added.</p>`;
+    }
+    document.getElementById('card-detail-body').innerHTML = bodyHtml;
+
+    // Footer
+    const doneBtn = done
+      ? `<button class="cd-btn muted-success" id="cd-done-btn">↩ Mark Undone</button>`
+      : `<button class="cd-btn success" id="cd-done-btn">✓ Mark Done</button>`;
+    const cmtCls  = commentCount > 0 ? 'active' : '';
+    const attCls  = attachCount  > 0 ? 'active' : '';
+    let footerHtml = doneBtn + `
+      <button class="cd-btn ${cmtCls}" id="cd-comments-btn">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z"
+                stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>${commentCount > 0 ? `${commentCount} Comment${commentCount !== 1 ? 's' : ''}` : 'Comments'}
+      </button>
+      <button class="cd-btn ${attCls}" id="cd-attach-btn">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2"
+                stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>${attachCount > 0 ? `${attachCount} File${attachCount !== 1 ? 's' : ''}` : 'Attachments'}
+      </button>
+      ${showWeight ? `<span class="cd-weight-badge ${weight > 1 ? 'weighted' : ''}" title="Step weight">×${weight}</span>` : ''}`;
+    if (isAdmin) {
+      footerHtml += `<span class="cd-spacer"></span>
+        <button class="cd-btn" id="cd-edit-btn">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M8.5 1.5L10.5 3.5L3.5 10.5H1.5V8.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+          </svg>Edit
+        </button>
+        <button class="cd-btn danger" id="cd-delete-btn">Delete</button>`;
+    }
+    document.getElementById('card-detail-footer').innerHTML = footerHtml;
+
+    document.getElementById('cd-step-check').addEventListener('click', () => {
+      if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
+      saveCurrentOpp(); render(); renderCardDetail();
+    });
+    document.getElementById('cd-done-btn').addEventListener('click', () => {
+      if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
+      saveCurrentOpp(); render(); renderCardDetail();
+    });
+    document.getElementById('cd-comments-btn').addEventListener('click', () => {
+      closeCardDetail(); openCommentsModal(id);
+    });
+    document.getElementById('cd-attach-btn').addEventListener('click', () => {
+      closeCardDetail(); openAttachmentsModal(id);
+    });
+    document.getElementById('cd-edit-btn')?.addEventListener('click', () => {
+      closeCardDetail(); openModal('step-edit', id);
+    });
+    document.getElementById('cd-delete-btn')?.addEventListener('click', () => {
+      closeCardDetail(); openDeleteModal('step', id);
+    });
+  }
 }
 
 // ── Event delegation ──────────────────────────────────
@@ -1317,7 +1507,6 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
   const id = card.dataset.prompt;
 
   if (state.role === 'admin') {
-    // Click anywhere on card → open edit modal
     openPromptEditModal(id);
     return;
   }
@@ -1385,9 +1574,13 @@ document.getElementById('steps-grid').addEventListener('click', e => {
   const card = e.target.closest('.prompt-card');
   if (!card || e.target.closest('.step-card-footer')) return;
   const id = card.dataset.step;
-  if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
-  saveCurrentOpp();
-  render();
+  if (e.target.closest('.prompt-check')) {
+    if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
+    saveCurrentOpp();
+    render();
+    return;
+  }
+  openCardDetail('step', id);
 });
 
 // Reset buttons
@@ -1421,6 +1614,17 @@ document.getElementById('reset-all-btn').addEventListener('click', () => {
     if (!state.cover) state.cover = {};
     state.cover[field] = e.target.value;
     saveCurrentOpp();
+    // Keep the Prep Doc "Open" link in sync as user types
+    if (field === 'prepDoc') {
+      const prepDocLink = document.getElementById('cover-prep-doc-link');
+      const val = e.target.value.trim();
+      if (val) {
+        prepDocLink.href = val.startsWith('http') ? val : 'https://' + val;
+        prepDocLink.classList.remove('hidden');
+      } else {
+        prepDocLink.classList.add('hidden');
+      }
+    }
   });
 });
 
@@ -1570,12 +1774,19 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (openCoverSelect) { openCoverSelect = null; renderCover(); return; }
   if (state.oppDropdownOpen) { state.oppDropdownOpen = false; renderOppSelector(); return; }
+  if (!document.getElementById('card-detail-overlay').classList.contains('hidden')) { closeCardDetail(); return; }
   if (!document.getElementById('prompt-edit-overlay').classList.contains('hidden'))  { closePromptEditModal(); return; }
   if (!document.getElementById('attachments-overlay').classList.contains('hidden')) { closeAttachmentsModal(); return; }
   if (!document.getElementById('comments-overlay').classList.contains('hidden'))    { closeCommentsModal(); return; }
   if (!document.getElementById('users-overlay').classList.contains('hidden'))       { closeUsersModal(); return; }
   if (!document.getElementById('modal-overlay').classList.contains('hidden'))       closeModal();
   if (!document.getElementById('delete-overlay').classList.contains('hidden'))      closeDeleteModal();
+});
+
+// Card detail modal
+document.getElementById('card-detail-close').addEventListener('click', closeCardDetail);
+document.getElementById('card-detail-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('card-detail-overlay')) closeCardDetail();
 });
 
 // Comments modal events
