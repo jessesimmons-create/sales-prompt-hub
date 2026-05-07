@@ -1290,7 +1290,7 @@ function renderCardDetail() {
     if (ep.explanation) {
       bodyHtml += `<div class="cd-section">
         <div class="cd-section-label">Description</div>
-        <div class="cd-desc ql-content">${ep.explanation}</div>
+        <div class="cd-desc ql-snow"><div class="ql-editor cd-ql-render">${ep.explanation}</div></div>
       </div>`;
     }
     if (ep.body) {
@@ -1370,7 +1370,7 @@ function renderCardDetail() {
     if (es.body) {
       bodyHtml += `<div class="cd-section">
         <div class="cd-section-label">Description</div>
-        <div class="cd-desc ql-content">${es.body}</div>
+        <div class="cd-desc ql-snow"><div class="ql-editor cd-ql-render">${es.body}</div></div>
       </div>`;
     }
     if (!es.body) {
