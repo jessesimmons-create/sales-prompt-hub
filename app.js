@@ -77,7 +77,6 @@ function saveCurrentOpp() {
 function determineRole(email, users) {
   if (!email) return 'standard';
   if (email.toLowerCase() === 'ccadmin') return 'admin';
-  if (users.length === 0) return 'admin';
   const u = users.find(u => u.email === email.toLowerCase());
   return u ? u.role : 'standard';
 }
@@ -339,7 +338,7 @@ function submitEmailGate() {
   errEl.classList.add('hidden');
 
   if (!state.users.find(u => u.email === email)) {
-    const role = state.users.length === 0 ? 'admin' : 'standard';
+    const role = 'standard';
     state.users.push({ email, role });
     saveUsers();
   }
