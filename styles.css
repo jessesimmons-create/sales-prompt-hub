@@ -2907,9 +2907,26 @@ body {
 
 .ss-step-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 3px 6px 3px 3px;
+  margin: 0 -6px 0 -3px;
+  transition: background 0.12s;
 }
+
+.ss-step-row:hover { background: var(--main-bg); }
+
+.ss-step-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-light);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.ss-step-row:hover .ss-step-chevron { opacity: 1; }
 
 .ss-step-check {
   width: 18px;
