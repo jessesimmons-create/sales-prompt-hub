@@ -1055,13 +1055,6 @@ function renderTabs(stage) {
   const summaryActive = state.activeCondId === '__summary__';
 
   document.getElementById('condition-tabs').innerHTML = `
-    <div class="cond-tab steps-tab ${state.activeCondId === '__steps__' ? 'active' : ''} ${stepState}"
-         style="--active-color:${stage.color}" data-cond="__steps__">
-      Steps
-      <span class="steps-tab-pct" style="color:${pct > 0 ? pctColor(pct) : ''}">${pct}%</span>
-    </div>
-    <div class="steps-tab-divider"></div>` + condTabs + `
-    <div class="steps-tab-divider"></div>
     <div class="cond-tab summary-tab ${summaryActive ? 'active' : ''} ${hasSummary ? 'has-summary' : ''}"
          style="--active-color:${stage.color}" data-cond="__summary__">
       <svg width="11" height="11" viewBox="0 0 12 12" fill="none" class="summary-tab-icon">
@@ -1069,7 +1062,14 @@ function renderTabs(stage) {
               fill="currentColor" opacity="0.85"/>
       </svg>
       Summary
-    </div>`;
+    </div>
+    <div class="steps-tab-divider"></div>
+    <div class="cond-tab steps-tab ${state.activeCondId === '__steps__' ? 'active' : ''} ${stepState}"
+         style="--active-color:${stage.color}" data-cond="__steps__">
+      Steps
+      <span class="steps-tab-pct" style="color:${pct > 0 ? pctColor(pct) : ''}">${pct}%</span>
+    </div>
+    <div class="steps-tab-divider"></div>` + condTabs;
 }
 
 // ── Render: Prompts ───────────────────────────────────
