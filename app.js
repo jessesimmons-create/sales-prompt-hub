@@ -8,6 +8,7 @@ const SK = {
   weights:      'sph_weights',
   promptEdits:  'sph_prompt_edits',
   stepEdits:    'sph_step_edits',
+  apiKey:       'sph_anthropic_key',
   opp: id => ({
     added:        `sph_${id}_added`,
     removed:      `sph_${id}_removed`,
@@ -113,6 +114,7 @@ const state = {
   weights:         storedWeights,
   promptEdits:     storedPromptEdits,
   stepEdits:       storedStepEdits,
+  stageSummaries:  {}, // in-memory only; { [stageId]: { loading, text, error, generatedAt } }
 };
 
 // ── Opportunity actions ───────────────────────────────
@@ -123,6 +125,7 @@ function switchOpp(id) {
   Object.assign(state, loadOppState(id));
   localStorage.setItem(SK.activeOpp, id);
   state.oppDropdownOpen = false;
+  state.stageSummaries = {}; // clear cached summaries — data is now for a different deal
   render();
 }
 
@@ -268,6 +271,280 @@ function getEffectiveStepById(id) {
     if (found) return getEffectiveStep(found);
   }
   return { id, title: '', body: '' };
+}
+
+// ── API key (Anthropic) ───────────────────────────────
+
+function getApiKey()      { return localStorage.getItem(SK.apiKey) || ''; }
+function saveApiKey(key)  { localStorage.setItem(SK.apiKey, key); }
+function clearApiKey()    { localStorage.removeItem(SK.apiKey); }
+
+// ── Stage Summary ─────────────────────────────────────
+
+function htmlToText(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || d.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function buildStageSummaryPrompt(stage) {
+  const c   = state.cover || {};
+  const opp = state.opps.find(o => o.id === state.activeOppId);
+  const dealContext = [
+    opp?.name         ? `Deal Name: ${opp.name}`           : '',
+    c.company         ? `Company: ${c.company}`            : '',
+    c.dealType === 'new-logo' ? 'Deal Type: New Logo'
+      : c.dealType === 'expansion' ? 'Deal Type: Expansion / Upsell / Renewal' : '',
+    c.dealValue       ? `Deal Value: ${c.dealValue}`       : '',
+    c.closeDate       ? `Expected Close: ${c.closeDate}`   : '',
+    c.contact         ? `Primary Contact: ${c.contact}`    : '',
+  ].filter(Boolean).join('\n');
+
+  const completedStepLines = effectiveSteps(stage)
+    .filter(s => state.stepsUsed.has(s.id))
+    .map(s => {
+      const es   = getEffectiveStep(s);
+      const cmts = state.comments
+        .filter(c => c.stepId === s.id)
+        .map(c => '    • ' + htmlToText(c.html))
+        .join('\n');
+      const atts = state.attachments
+        .filter(a => a.stepId === s.id)
+        .map(a => `    📎 ${a.name}`)
+        .join('\n');
+      let line = `- ${es.title}`;
+      if (cmts) line += `\n  Notes:\n${cmts}`;
+      if (atts) line += `\n  Files:\n${atts}`;
+      return line;
+    });
+
+  return `You are a sales assistant. Write a concise professional summary of what was accomplished in the "${stage.name}" stage of this deal.
+
+Deal context:
+${dealContext || '(no deal details entered)'}
+
+Completed steps in "${stage.name}" (${completedStepLines.length} total):
+${completedStepLines.join('\n\n')}
+
+Instructions:
+- Write 2–4 short paragraphs.
+- Paragraph 1: briefly describe what this stage covers and what was accomplished.
+- Paragraph 2: highlight key findings, decisions, or outcomes from the notes and files.
+- Paragraph 3 (if relevant): surface any important context, risks, or implied next steps.
+- Be factual, professional, and concise. Do not invent details not present above.
+- Do not use markdown headers or bullet points in your response; write in flowing prose.`;
+}
+
+async function generateStageSummary(stageId) {
+  const apiKey = getApiKey();
+  if (!apiKey) return;
+  const stage = STAGES.find(s => s.id === stageId);
+  if (!stage) return;
+
+  // Mark as loading and re-render
+  state.stageSummaries[stageId] = { loading: true, text: '', error: '', generatedAt: null };
+  if (state.activeStageId === stageId && state.activeCondId === '__summary__') {
+    renderStageSummary(stage);
+  }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key':                        apiKey,
+        'anthropic-version':                '2023-06-01',
+        'content-type':                     'application/json',
+        'anthropic-dangerous-allow-browser':'true',
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages:   [{ role: 'user', content: buildStageSummaryPrompt(stage) }],
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `API error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    state.stageSummaries[stageId] = { loading: false, text, error: '', generatedAt: Date.now() };
+  } catch (err) {
+    state.stageSummaries[stageId] = {
+      loading: false, text: '', error: err.message || 'Unknown error', generatedAt: null,
+    };
+  }
+
+  if (state.activeStageId === stageId && state.activeCondId === '__summary__') {
+    const s = STAGES.find(s => s.id === stageId);
+    if (s) renderStageSummary(s);
+  }
+}
+
+function renderStageSummary(stage) {
+  document.getElementById('condition-banner').style.display = 'none';
+  document.getElementById('prompts-grid').style.display     = 'none';
+  document.getElementById('steps-view').classList.add('hidden');
+  document.getElementById('stage-summary-view').classList.remove('hidden');
+
+  const completedSteps = effectiveSteps(stage).filter(s => state.stepsUsed.has(s.id));
+  const apiKey  = getApiKey();
+  const summary = state.stageSummaries[stage.id]; // undefined | { loading, text, error, generatedAt }
+
+  // Auto-generate on first visit if conditions are met
+  if (apiKey && completedSteps.length > 0 && summary === undefined) {
+    generateStageSummary(stage.id);
+    return; // generateStageSummary sets loading:true and calls us again
+  }
+
+  // ── Completed steps section ──────────────────────────
+  let stepsHtml = '';
+  if (completedSteps.length === 0) {
+    stepsHtml = '<p class="ss-empty-steps">No steps completed in this stage yet.</p>';
+  } else {
+    stepsHtml = completedSteps.map(s => {
+      const es           = getEffectiveStep(s);
+      const commentCount = state.comments.filter(c => c.stepId === s.id).length;
+      const attachCount  = state.attachments.filter(a => a.stepId === s.id).length;
+      const metaParts    = [];
+      if (commentCount > 0) metaParts.push(`${commentCount} comment${commentCount !== 1 ? 's' : ''}`);
+      if (attachCount  > 0) metaParts.push(`${attachCount} file${attachCount  !== 1 ? 's' : ''}`);
+      return `
+        <div class="ss-step-row">
+          <div class="ss-step-check">
+            <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
+              <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="ss-step-info">
+            <span class="ss-step-title">${escHtml(es.title)}</span>
+            ${metaParts.length ? `<span class="ss-step-meta">${metaParts.join(' · ')}</span>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── AI content section ───────────────────────────────
+  let aiHtml = '';
+  if (!apiKey) {
+    aiHtml = `
+      <div class="ss-api-prompt">
+        <p class="ss-api-intro">Enter your Anthropic API key to generate an AI summary of completed activities for this stage.</p>
+        <div class="ss-api-key-form">
+          <input type="password" id="ss-api-key-input" class="ss-api-key-input"
+                 placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" />
+          <button class="ss-api-key-save" id="ss-api-key-save">Save &amp; Generate</button>
+        </div>
+        <p class="ss-api-note">Your key is stored locally in this browser only.</p>
+      </div>`;
+  } else if (completedSteps.length === 0) {
+    aiHtml = `<p class="ss-empty-ai">Complete some steps first to generate an AI summary.</p>`;
+  } else if (summary?.loading) {
+    aiHtml = `
+      <div class="ss-loading">
+        <div class="ss-spinner"></div>
+        <span>Generating summary with Claude Sonnet…</span>
+      </div>`;
+  } else if (summary?.error) {
+    aiHtml = `
+      <div class="ss-error">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0">
+          <circle cx="7" cy="7" r="6" stroke="#ef4444" stroke-width="1.4"/>
+          <path d="M7 4v3.5M7 9v.5" stroke="#ef4444" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span>${escHtml(summary.error)}</span>
+        <button class="ss-regen-btn" id="ss-regen-btn">Try Again</button>
+      </div>
+      <button class="ss-change-key-btn" id="ss-change-key-btn">Change API Key</button>`;
+  } else if (summary?.text) {
+    const ts = new Date(summary.generatedAt).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    const paragraphs = summary.text.split(/\n\n+/).map(p => `<p>${escHtml(p.trim())}</p>`).join('');
+    aiHtml = `
+      <div class="ss-summary-text">${paragraphs}</div>
+      <div class="ss-summary-footer">
+        <span class="ss-gen-info">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="opacity:.6">
+            <path d="M5 1l1 3h3l-2.5 1.8.9 3L5 7.1 2.6 8.8l.9-3L1 4h3z" fill="currentColor"/>
+          </svg>
+          claude-sonnet-4-5 · ${ts}
+        </span>
+        <div class="ss-footer-actions">
+          <button class="ss-change-key-btn" id="ss-change-key-btn">Change Key</button>
+          <button class="ss-regen-btn" id="ss-regen-btn">↻ Regenerate</button>
+        </div>
+      </div>`;
+  } else {
+    // Has key, has steps, but user cleared and wants manual trigger
+    aiHtml = `
+      <div class="ss-generate-wrap">
+        <button class="ss-generate-btn" id="ss-generate-btn">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.05 3.05l2.12 2.12M10.83 10.83l2.12 2.12M3.05 12.95l2.12-2.12M10.83 5.17l2.12-2.12"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Generate AI Summary
+        </button>
+        <button class="ss-change-key-btn" id="ss-change-key-btn">Change Key</button>
+      </div>`;
+  }
+
+  const { total: sTotal, used: sUsed } = stepStats(stage);
+
+  document.getElementById('stage-summary-view').innerHTML = `
+    <div class="ss-container">
+
+      <div class="ss-card">
+        <div class="ss-card-header">
+          <h3 class="ss-card-title">Completed Steps</h3>
+          <span class="ss-count-badge" style="color:${sUsed === sTotal && sTotal > 0 ? '#22c55e' : 'var(--text-muted)'}">
+            ${sUsed} / ${sTotal}
+          </span>
+        </div>
+        <div class="ss-steps-list">${stepsHtml}</div>
+      </div>
+
+      <div class="ss-card ss-ai-card">
+        <div class="ss-card-header">
+          <h3 class="ss-card-title">AI Summary</h3>
+          <div class="ss-model-badge">
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+              <path d="M5 1l1 3h3l-2.5 1.8.9 3L5 7.1 2.6 8.8l.9-3L1 4h3z" fill="currentColor"/>
+            </svg>
+            claude-sonnet-4-5
+          </div>
+        </div>
+        <div class="ss-ai-body">${aiHtml}</div>
+      </div>
+
+    </div>`;
+
+  // Wire up events
+  document.getElementById('ss-api-key-save')?.addEventListener('click', () => {
+    const key = document.getElementById('ss-api-key-input')?.value.trim();
+    if (!key) return;
+    saveApiKey(key);
+    state.stageSummaries[stage.id] = undefined;
+    generateStageSummary(stage.id);
+  });
+  document.getElementById('ss-api-key-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('ss-api-key-save')?.click();
+  });
+  document.getElementById('ss-regen-btn')?.addEventListener('click', () => {
+    generateStageSummary(stage.id);
+  });
+  document.getElementById('ss-generate-btn')?.addEventListener('click', () => {
+    generateStageSummary(stage.id);
+  });
+  document.getElementById('ss-change-key-btn')?.addEventListener('click', () => {
+    clearApiKey();
+    state.stageSummaries[stage.id] = undefined;
+    renderStageSummary(stage);
+  });
 }
 
 // ── Prompt edit modal (admin) ─────────────────────────
@@ -774,13 +1051,25 @@ function renderTabs(stage) {
   const pct       = weightedTotal ? Math.round((weightedUsed / weightedTotal) * 100) : 0;
   const stepState = pct === 100 ? 'complete' : pct > 0 ? 'in-progress' : '';
 
+  const hasSummary    = !!(state.stageSummaries[stage.id]?.text);
+  const summaryActive = state.activeCondId === '__summary__';
+
   document.getElementById('condition-tabs').innerHTML = `
     <div class="cond-tab steps-tab ${state.activeCondId === '__steps__' ? 'active' : ''} ${stepState}"
          style="--active-color:${stage.color}" data-cond="__steps__">
       Steps
       <span class="steps-tab-pct" style="color:${pct > 0 ? pctColor(pct) : ''}">${pct}%</span>
     </div>
-    <div class="steps-tab-divider"></div>` + condTabs;
+    <div class="steps-tab-divider"></div>` + condTabs + `
+    <div class="steps-tab-divider"></div>
+    <div class="cond-tab summary-tab ${summaryActive ? 'active' : ''} ${hasSummary ? 'has-summary' : ''}"
+         style="--active-color:${stage.color}" data-cond="__summary__">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" class="summary-tab-icon">
+        <path d="M6 1l1.2 3.5H11L8.2 6.6l1.1 3.4L6 8.2 2.7 10l1.1-3.4L1 4.5h3.8z"
+              fill="currentColor" opacity="0.85"/>
+      </svg>
+      Summary
+    </div>`;
 }
 
 // ── Render: Prompts ───────────────────────────────────
@@ -789,6 +1078,7 @@ function renderPrompts(stage) {
   document.getElementById('condition-banner').style.display = '';
   document.getElementById('prompts-grid').style.display     = '';
   document.getElementById('steps-view').classList.add('hidden');
+  document.getElementById('stage-summary-view').classList.add('hidden');
 
   const cond = stage.conditions.find(c => c.id === state.activeCondId);
   if (!cond) return;
@@ -854,6 +1144,7 @@ function renderSteps(stage) {
   document.getElementById('condition-banner').style.display = 'none';
   document.getElementById('prompts-grid').style.display     = 'none';
   document.getElementById('steps-view').classList.remove('hidden');
+  document.getElementById('stage-summary-view').classList.add('hidden');
 
   const steps    = effectiveSteps(stage);
   const dealType = state.cover?.dealType;
@@ -1094,7 +1385,8 @@ function render() {
   const stage = STAGES.find(s => s.id === state.activeStageId);
   renderHeader(stage);
   renderTabs(stage);
-  if (state.activeCondId === '__steps__') renderSteps(stage);
+  if (state.activeCondId === '__steps__')    renderSteps(stage);
+  else if (state.activeCondId === '__summary__') renderStageSummary(stage);
   else renderPrompts(stage);
 }
 
