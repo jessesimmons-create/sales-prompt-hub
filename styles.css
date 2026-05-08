@@ -658,6 +658,7 @@ body {
 
 #steps-view { display: flex; flex-direction: column; gap: 20px; }
 #steps-view.hidden { display: none; }
+#stage-summary-view.hidden { display: none; }
 
 #steps-progress-section {
   background: var(--card-bg);
