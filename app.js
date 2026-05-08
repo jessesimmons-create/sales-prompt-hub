@@ -106,7 +106,7 @@ const state = {
   activeOppId:     initialOppId,
   ...loadOppState(initialOppId),
   activeStageId:   STAGES[0].id,
-  activeCondId:    '__summary__',
+  activeCondId:    STAGES[0].conditions[0].id,
   oppDropdownOpen: false,
   users:           storedUsers,
   currentEmail:    storedEmail,
@@ -1069,7 +1069,7 @@ function renderTabs(stage) {
       Steps
       <span class="steps-tab-pct" style="color:${pct > 0 ? pctColor(pct) : ''}">${pct}%</span>
     </div>
-    <div class="steps-tab-divider"></div>`;
+    <div class="steps-tab-divider"></div>` + condTabs;
 }
 
 // ── Render: Prompts ───────────────────────────────────
@@ -1772,7 +1772,7 @@ document.getElementById('stage-list').addEventListener('click', e => {
   }
   const stage = STAGES.find(s => s.id === stageId);
   state.activeStageId = stage.id;
-  state.activeCondId  = '__summary__';
+  state.activeCondId  = stage.conditions[0].id;
   render();
 });
 
@@ -1968,7 +1968,7 @@ document.getElementById('cover-stages-grid').addEventListener('click', e => {
   const stage = STAGES.find(s => s.id === card.dataset.navStage);
   if (!stage) return;
   state.activeStageId = stage.id;
-  state.activeCondId  = '__summary__';
+  state.activeCondId  = stage.conditions[0].id;
   render();
 });
 
