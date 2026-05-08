@@ -412,7 +412,7 @@ function renderStageSummary(stage) {
       if (commentCount > 0) metaParts.push(`${commentCount} comment${commentCount !== 1 ? 's' : ''}`);
       if (attachCount  > 0) metaParts.push(`${attachCount} file${attachCount  !== 1 ? 's' : ''}`);
       return `
-        <div class="ss-step-row" data-ss-open-step="${s.id}">
+        <div class="ss-step-row">
           <div class="ss-step-check">
             <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
               <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
@@ -423,10 +423,6 @@ function renderStageSummary(stage) {
             <span class="ss-step-title">${escHtml(es.title)}</span>
             ${metaParts.length ? `<span class="ss-step-meta">${metaParts.join(' · ')}</span>` : ''}
           </div>
-          <svg class="ss-step-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M4.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.5"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
         </div>`;
     }).join('');
   }
@@ -548,11 +544,6 @@ function renderStageSummary(stage) {
     clearApiKey();
     state.stageSummaries[stage.id] = undefined;
     renderStageSummary(stage);
-  });
-
-  // Completed step rows → open card detail
-  document.getElementById('stage-summary-view').querySelectorAll('[data-ss-open-step]').forEach(row => {
-    row.addEventListener('click', () => openCardDetail('step', row.dataset.ssOpenStep));
   });
 }
 
@@ -1806,8 +1797,12 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
   if (!card) return;
   const id = card.dataset.prompt;
 
+  if (state.role === 'admin') {
+    openPromptEditModal(id);
+    return;
+  }
+
   // Standard user: copy body to clipboard, flash "Copied!"
-  // (Card detail / edit modal is accessible from the Summary tab only)
   const ep = getEffectivePromptById(id);
   if (ep.body) {
     navigator.clipboard.writeText(ep.body).catch(() => {});
@@ -1874,8 +1869,9 @@ document.getElementById('steps-grid').addEventListener('click', e => {
     if (state.stepsUsed.has(id)) state.stepsUsed.delete(id); else state.stepsUsed.add(id);
     saveCurrentOpp();
     render();
+    return;
   }
-  // Card detail is only accessible from the Summary tab
+  openCardDetail('step', id);
 });
 
 // Reset buttons
