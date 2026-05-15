@@ -1,5 +1,51 @@
 const STAGES = [
   {
+    id: 'prospecting',
+    name: 'Prospecting',
+    icon: '🔭',
+    color: '#f97316',
+    steps: [
+      { id: 'stp-pro-1', title: 'Define ideal customer profile and target account list' },
+      { id: 'stp-pro-2', title: 'Research prospect and identify key contacts' },
+      { id: 'stp-pro-3', title: 'Find and validate contact information' },
+      { id: 'stp-pro-4', title: 'Craft personalized outreach sequence' },
+      { id: 'stp-pro-5', title: 'Send initial outreach and log in CRM' },
+    ],
+    conditions: [
+      {
+        id: 'pro-new-logo',
+        name: 'New Logo',
+        description: 'Reaching out to a net-new account with no prior relationship.',
+        prompts: [
+          { id: 'pro-nl-1', title: 'ICP Qualification Check', body: '' },
+          { id: 'pro-nl-2', title: 'Cold Outreach Email', body: '' },
+          { id: 'pro-nl-3', title: 'LinkedIn Connection Message', body: '' },
+          { id: 'pro-nl-4', title: 'Follow-up Sequence', body: '' },
+        ],
+      },
+      {
+        id: 'pro-expansion',
+        name: 'Expansion / Upsell',
+        description: 'Prospecting into a new team or buying center within an existing account.',
+        prompts: [
+          { id: 'pro-ex-1', title: 'Warm Introduction Request', body: '' },
+          { id: 'pro-ex-2', title: 'Cross-sell Outreach', body: '' },
+          { id: 'pro-ex-3', title: 'Existing Customer Referral Ask', body: '' },
+        ],
+      },
+      {
+        id: 'pro-no-response',
+        name: 'No Response',
+        description: 'Initial outreach sent but prospect has not replied.',
+        prompts: [
+          { id: 'pro-nr-1', title: 'Bump / Nudge Email', body: '' },
+          { id: 'pro-nr-2', title: 'Channel Switch (Call / LinkedIn)', body: '' },
+          { id: 'pro-nr-3', title: 'Breakup / Last-Attempt Email', body: '' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'prep-strat',
     name: 'Prep Strat',
     icon: '🎯',
