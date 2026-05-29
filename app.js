@@ -18,6 +18,7 @@ const SK = {
     comments:     `sph_${id}_comments`,
     cover:        `sph_${id}_cover`,
     attachments:  `sph_${id}_attachments`,
+    stageNotes:   `sph_${id}_stage_notes`,
   }),
 };
 
@@ -54,6 +55,7 @@ function loadOppState(id) {
     comments:          JSON.parse(localStorage.getItem(k.comments)     || '[]'),
     cover:             JSON.parse(localStorage.getItem(k.cover)        || '{}'),
     attachments:       JSON.parse(localStorage.getItem(k.attachments)  || '[]'),
+    stageNotes:        JSON.parse(localStorage.getItem(k.stageNotes)   || '{}'),
   };
 }
 
@@ -66,6 +68,7 @@ function saveCurrentOpp() {
   localStorage.setItem(k.stepsRemoved, JSON.stringify([...state.stepsRemoved]));
   localStorage.setItem(k.comments,     JSON.stringify(state.comments));
   localStorage.setItem(k.cover,        JSON.stringify(state.cover));
+  localStorage.setItem(k.stageNotes,   JSON.stringify(state.stageNotes));
   try {
     localStorage.setItem(k.attachments, JSON.stringify(state.attachments));
   } catch (e) {
@@ -106,7 +109,7 @@ const state = {
   activeOppId:     initialOppId,
   ...loadOppState(initialOppId),
   activeStageId:   STAGES[0].id,
-  activeCondId:    STAGES[0].conditions[0].id,
+  activeCondId:    '__summary__',
   oppDropdownOpen: false,
   users:           storedUsers,
   currentEmail:    storedEmail,
@@ -496,6 +499,8 @@ function renderStageSummary(stage) {
 
   const { total: sTotal, used: sUsed } = stepStats(stage);
 
+  const savedNotes = state.stageNotes?.[stage.id] || '';
+
   document.getElementById('stage-summary-view').innerHTML = `
     <div class="ss-container">
 
@@ -507,6 +512,16 @@ function renderStageSummary(stage) {
           </span>
         </div>
         <div class="ss-steps-list">${stepsHtml}</div>
+      </div>
+
+      <div class="ss-card ss-notes-card">
+        <div class="ss-card-header">
+          <h3 class="ss-card-title">Deal Notes</h3>
+        </div>
+        <div class="ss-notes-body">
+          <textarea class="ss-notes-textarea" id="ss-notes-textarea"
+                    placeholder="Notes, observations, or anything relevant to this stage…">${escHtml(savedNotes)}</textarea>
+        </div>
       </div>
 
       <div class="ss-card ss-ai-card">
@@ -545,6 +560,13 @@ function renderStageSummary(stage) {
     clearApiKey();
     state.stageSummaries[stage.id] = undefined;
     renderStageSummary(stage);
+  });
+
+  // Deal Notes — auto-save on input
+  document.getElementById('ss-notes-textarea')?.addEventListener('input', e => {
+    if (!state.stageNotes) state.stageNotes = {};
+    state.stageNotes[stage.id] = e.target.value;
+    saveCurrentOpp();
   });
 
   // Completed step rows → open card detail
@@ -1791,7 +1813,7 @@ document.getElementById('stage-list').addEventListener('click', e => {
   }
   const stage = STAGES.find(s => s.id === stageId);
   state.activeStageId = stage.id;
-  state.activeCondId  = stage.conditions[0].id;
+  state.activeCondId  = '__summary__';
   render();
 });
 
@@ -1987,7 +2009,7 @@ document.getElementById('cover-stages-grid').addEventListener('click', e => {
   const stage = STAGES.find(s => s.id === card.dataset.navStage);
   if (!stage) return;
   state.activeStageId = stage.id;
-  state.activeCondId  = stage.conditions[0].id;
+  state.activeCondId  = '__summary__';
   render();
 });
 
