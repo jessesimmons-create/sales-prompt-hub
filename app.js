@@ -465,7 +465,8 @@ function renderStageSummary(stage) {
     });
     const paragraphs = summary.text.split(/\n\n+/).map(p => `<p>${escHtml(p.trim())}</p>`).join('');
     aiHtml = `
-      <div class="ss-summary-text">${paragraphs}</div>
+      <div class="ss-summary-text" id="ss-text-content">${paragraphs}</div>
+      <button class="ss-show-more hidden" id="ss-show-more">Show more ↓</button>
       <div class="ss-summary-footer">
         <span class="ss-gen-info">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="opacity:.6">
@@ -545,6 +546,24 @@ function renderStageSummary(stage) {
     state.stageSummaries[stage.id] = undefined;
     renderStageSummary(stage);
   });
+
+  // Completed step rows → open card detail
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ss-open-step]').forEach(row => {
+    row.addEventListener('click', () => openCardDetail('step', row.dataset.ssOpenStep));
+  });
+
+  // Show more / collapse for AI summary text
+  const summaryTextEl = document.getElementById('ss-text-content');
+  const showMoreBtn   = document.getElementById('ss-show-more');
+  if (summaryTextEl && showMoreBtn) {
+    if (summaryTextEl.scrollHeight > summaryTextEl.clientHeight + 4) {
+      showMoreBtn.classList.remove('hidden');
+    }
+    showMoreBtn.addEventListener('click', () => {
+      const expanded = summaryTextEl.classList.toggle('expanded');
+      showMoreBtn.textContent = expanded ? '↑ Collapse' : 'Show more ↓';
+    });
+  }
 }
 
 // ── Prompt edit modal (admin) ─────────────────────────
