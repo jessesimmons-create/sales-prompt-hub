@@ -19,6 +19,7 @@ const SK = {
     cover:        `sph_${id}_cover`,
     attachments:  `sph_${id}_attachments`,
     stageNotes:   `sph_${id}_stage_notes`,
+    stepRounds:   `sph_${id}_step_rounds`,
   }),
 };
 
@@ -56,6 +57,7 @@ function loadOppState(id) {
     cover:             JSON.parse(localStorage.getItem(k.cover)        || '{}'),
     attachments:       JSON.parse(localStorage.getItem(k.attachments)  || '[]'),
     stageNotes:        JSON.parse(localStorage.getItem(k.stageNotes)   || '{}'),
+    stepRounds:        JSON.parse(localStorage.getItem(k.stepRounds)   || '{}'),
   };
 }
 
@@ -69,6 +71,7 @@ function saveCurrentOpp() {
   localStorage.setItem(k.comments,     JSON.stringify(state.comments));
   localStorage.setItem(k.cover,        JSON.stringify(state.cover));
   localStorage.setItem(k.stageNotes,   JSON.stringify(state.stageNotes));
+  localStorage.setItem(k.stepRounds,   JSON.stringify(state.stepRounds || {}));
   try {
     localStorage.setItem(k.attachments, JSON.stringify(state.attachments));
   } catch (e) {
@@ -147,6 +150,8 @@ function createOpp(name) {
   state.comments      = [];
   state.cover         = { opportunityOwner: state.currentEmail };
   state.attachments   = [];
+  state.stageNotes    = {};
+  state.stepRounds    = {};
   state.activeStageId = '__cover__';
   localStorage.setItem(SK.activeOpp, id);
   saveCurrentOpp();
@@ -268,12 +273,44 @@ function getEffectiveStep(s) {
   };
 }
 
+// Round step IDs look like: "originalId__1748000000000" (13-digit timestamp)
+function roundStepBaseId(id) {
+  const m = id.match(/^(.+)__(\d{13})$/);
+  return m ? m[1] : id;
+}
+
 function getEffectiveStepById(id) {
+  const baseId = roundStepBaseId(id);
   for (const s of STAGES) {
-    const found = effectiveSteps(s).find(x => x.id === id);
+    const found = effectiveSteps(s).find(x => x.id === baseId);
     if (found) return getEffectiveStep(found);
   }
   return { id, title: '', body: '' };
+}
+
+// ── Step Rounds (multiple passes through the same steps) ─
+
+function addStepRound(stageId) {
+  if (!state.stepRounds) state.stepRounds = {};
+  if (!state.stepRounds[stageId]) state.stepRounds[stageId] = [];
+  state.stepRounds[stageId].push(Date.now());
+  saveCurrentOpp();
+  const stage = STAGES.find(s => s.id === stageId);
+  if (stage) renderSteps(stage);
+}
+
+function removeStepRound(stageId, ts) {
+  if (!state.stepRounds?.[stageId]) return;
+  const stage = STAGES.find(s => s.id === stageId);
+  // Remove progress for this round's step IDs
+  if (stage) {
+    effectiveSteps(stage).forEach(s => {
+      state.stepsUsed.delete(`${s.id}__${ts}`);
+    });
+  }
+  state.stepRounds[stageId] = state.stepRounds[stageId].filter(t => t !== ts);
+  saveCurrentOpp();
+  if (stage) renderSteps(stage);
 }
 
 // ── API key (Anthropic) ───────────────────────────────
@@ -908,13 +945,22 @@ function effectiveSteps(stage) {
 }
 
 function stepStats(stage) {
-  const steps        = effectiveSteps(stage);
-  const used         = steps.filter(s => state.stepsUsed.has(s.id)).length;
-  const total        = steps.length;
-  const weightedTotal = steps.reduce((sum, s) => sum + getStepWeight(s.id), 0);
-  const weightedUsed  = steps
-    .filter(s => state.stepsUsed.has(s.id))
-    .reduce((sum, s) => sum + getStepWeight(s.id), 0);
+  const steps  = effectiveSteps(stage);
+  const rounds = state.stepRounds?.[stage.id] || [];
+  let total = 0, used = 0, weightedTotal = 0, weightedUsed = 0;
+
+  // Helper to tally one set of steps with given IDs
+  function tallySteps(stepIdPairs) {
+    for (const { s, id } of stepIdPairs) {
+      const w = getStepWeight(s.id);
+      total++; weightedTotal += w;
+      if (state.stepsUsed.has(id)) { used++; weightedUsed += w; }
+    }
+  }
+
+  tallySteps(steps.map(s => ({ s, id: s.id })));
+  rounds.forEach(ts => tallySteps(steps.map(s => ({ s, id: `${s.id}__${ts}` }))));
+
   return { total, used, weightedTotal, weightedUsed };
 }
 
@@ -951,6 +997,8 @@ function ensureValidActiveOpp() {
     state.comments      = [];
     state.cover         = { opportunityOwner: state.currentEmail };
     state.attachments   = [];
+    state.stageNotes    = {};
+    state.stepRounds    = {};
     state.activeStageId = '__cover__';
     localStorage.setItem(SK.activeOpp, id);
     saveCurrentOpp();
@@ -1195,6 +1243,7 @@ function renderSteps(stage) {
   document.getElementById('stage-summary-view').classList.add('hidden');
 
   const steps    = effectiveSteps(stage);
+  const rounds   = state.stepRounds?.[stage.id] || [];
   const dealType = state.cover?.dealType;
   const { used, total, weightedUsed, weightedTotal } = stepStats(stage);
   const isWeighted = !!dealType && weightedTotal !== total;
@@ -1239,79 +1288,123 @@ function renderSteps(stage) {
       <button class="steps-goto-cover-btn">Deal Overview →</button>
     </div>` : '';
 
-  const cards = steps.map(s => {
-    const es           = getEffectiveStep(s);
-    const done         = state.stepsUsed.has(s.id);
-    const commentCount = state.comments.filter(c => c.stepId === s.id).length;
-    const attachCount  = state.attachments.filter(a => a.stepId === s.id).length;
-    const weight        = getStepWeight(s.id);
-    const isPending     = pendingWeightChange?.stepId === s.id;
-    const displayWeight = isPending ? pendingWeightChange.newWeight : weight;
-    const showWeight    = !!dealType && (state.role === 'admin' || weight > 1 || isPending);
-    const weightClass   = isPending ? 'is-pending' : (weight > 1 ? 'is-weighted' : '');
-    return `
-      <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${s.id}">
-        <div class="prompt-card-top">
-          <div class="prompt-check">
-            <svg class="check-icon" viewBox="0 0 11 11" fill="none">
-              <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+  // Build one set of step cards. displayId = the ID used in stepsUsed tracking.
+  // showDelete = only for base/custom steps (not round copies)
+  function buildStepCards(displayIdFn, showDelete) {
+    return steps.map(s => {
+      const displayId    = displayIdFn(s);
+      const es           = getEffectiveStep(s);
+      const done         = state.stepsUsed.has(displayId);
+      const commentCount = state.comments.filter(c => c.stepId === displayId).length;
+      const attachCount  = state.attachments.filter(a => a.stepId === displayId).length;
+      const weight        = getStepWeight(s.id);
+      const isPending     = pendingWeightChange?.stepId === s.id;
+      const displayWeight = isPending ? pendingWeightChange.newWeight : weight;
+      const showWeight    = !!dealType && (state.role === 'admin' || weight > 1 || isPending);
+      const weightClass   = isPending ? 'is-pending' : (weight > 1 ? 'is-weighted' : '');
+      return `
+        <div class="prompt-card step-card ${done ? 'used' : ''}" data-step="${displayId}">
+          <div class="prompt-card-top">
+            <div class="prompt-check">
+              <svg class="check-icon" viewBox="0 0 11 11" fill="none">
+                <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="prompt-title">${escHtml(es.title)}</span>
+            ${commentCount > 0 ? `
+            <span class="step-mini-badge" data-comments-step="${displayId}" title="${commentCount} comment${commentCount !== 1 ? 's' : ''}">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+              </svg>${commentCount}
+            </span>` : ''}
+            ${attachCount > 0 ? `
+            <span class="step-mini-badge atch-badge" data-attachments-step="${displayId}" title="${attachCount} file${attachCount !== 1 ? 's' : ''}">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>${attachCount}
+            </span>` : ''}
           </div>
-          <span class="prompt-title">${escHtml(es.title)}</span>
-          ${commentCount > 0 ? `
-          <span class="step-mini-badge" data-comments-step="${s.id}" title="${commentCount} comment${commentCount !== 1 ? 's' : ''}">
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-              <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-            </svg>${commentCount}
-          </span>` : ''}
-          ${attachCount > 0 ? `
-          <span class="step-mini-badge atch-badge" data-attachments-step="${s.id}" title="${attachCount} file${attachCount !== 1 ? 's' : ''}">
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-              <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            </svg>${attachCount}
-          </span>` : ''}
-        </div>
-        <span class="used-pill">✓ Done</span>
-        ${state.role === 'admin' ? `
-        <button class="prompt-delete-btn" data-delete-step="${s.id}" title="Remove step">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
-                  stroke-linecap="round"/>
-          </svg>
-        </button>` : ''}
-        <div class="step-card-footer">
-          <button class="step-comments-btn ${commentCount > 0 ? 'has-comments' : ''}" data-comments-step="${s.id}">
+          <span class="used-pill">✓ Done</span>
+          ${showDelete && state.role === 'admin' ? `
+          <button class="prompt-delete-btn" data-delete-step="${s.id}" title="Remove step">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z"
-                    stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round"/>
             </svg>
-            ${commentCount > 0 ? `${commentCount} comment${commentCount !== 1 ? 's' : ''}` : 'Add comment'}
-          </button>
-          <button class="step-attachments-btn ${attachCount > 0 ? 'has-attachments' : ''}" data-attachments-step="${s.id}">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            </svg>
-            ${attachCount > 0 ? `${attachCount} file${attachCount !== 1 ? 's' : ''}` : 'Attach'}
-          </button>
-          ${showWeight ? `
-          <button class="step-weight-btn ${weightClass} ${state.role !== 'admin' ? 'read-only' : ''}"
-                  ${state.role === 'admin' ? `data-weight-step="${s.id}"` : ''}
-                  title="${state.role === 'admin' ? `Weight: ×${displayWeight} — click to change` : `Weight: ×${displayWeight}`}">
-            ×${displayWeight}
           </button>` : ''}
-        </div>
-      </div>`;
-  }).join('');
+          <div class="step-card-footer">
+            <button class="step-comments-btn ${commentCount > 0 ? 'has-comments' : ''}" data-comments-step="${displayId}">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M10 1H2a1 1 0 00-1 1v6a1 1 0 001 1h2l2 2 2-2h2a1 1 0 001-1V2a1 1 0 00-1-1z"
+                      stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              </svg>
+              ${commentCount > 0 ? `${commentCount} comment${commentCount !== 1 ? 's' : ''}` : 'Add comment'}
+            </button>
+            <button class="step-attachments-btn ${attachCount > 0 ? 'has-attachments' : ''}" data-attachments-step="${displayId}">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M10.5 5.5L5.5 10.5a3 3 0 01-4.24-4.25L7.09 .42a1.75 1.75 0 012.47 2.47L3.72 8.73a.5.5 0 01-.71-.7L8.84 2.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+              ${attachCount > 0 ? `${attachCount} file${attachCount !== 1 ? 's' : ''}` : 'Attach'}
+            </button>
+            ${showWeight ? `
+            <button class="step-weight-btn ${weightClass} ${state.role !== 'admin' ? 'read-only' : ''}"
+                    ${state.role === 'admin' ? `data-weight-step="${s.id}"` : ''}
+                    title="${state.role === 'admin' ? `Weight: ×${displayWeight} — click to change` : `Weight: ×${displayWeight}`}">
+              ×${displayWeight}
+            </button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
 
-  const addBtn = state.role === 'admin' ? `
-    <button class="add-prompt-btn" data-add-step="${stage.id}" style="--add-color:${stage.color}">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  const hasRounds = rounds.length > 0;
+
+  // Section header for a round (index 0 = base set)
+  function roundHeader(label, ts) {
+    const removeBtn = ts != null ? `
+      <button class="step-round-remove-btn" data-remove-round="${ts}" data-round-stage="${stage.id}">
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+          <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Remove
+      </button>` : '';
+    return `<div class="step-round-header"><span class="step-round-label">${label}</span>${removeBtn}</div>`;
+  }
+
+  let gridHtml = nudge;
+
+  // Base set — with section header only when rounds exist
+  if (hasRounds) gridHtml += roundHeader(`${stage.name} 1`, null);
+  gridHtml += buildStepCards(s => s.id, true);
+
+  // Additional rounds
+  rounds.forEach((ts, i) => {
+    gridHtml += roundHeader(`${stage.name} ${i + 2}`, ts);
+    gridHtml += buildStepCards(s => `${s.id}__${ts}`, false);
+  });
+
+  // "Add [Stage Name]" button — always visible
+  gridHtml += `
+    <button class="add-round-btn" data-add-round="${stage.id}" style="--add-color:${stage.color}">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
         <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
-      Add Step
-    </button>` : '';
-  document.getElementById('steps-grid').innerHTML = nudge + cards + addBtn;
+      Add ${stage.name}
+    </button>`;
+
+  // "Add Step" button — admin only
+  if (state.role === 'admin') {
+    gridHtml += `
+      <button class="add-prompt-btn" data-add-step="${stage.id}" style="--add-color:${stage.color}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Add Step
+      </button>`;
+  }
+
+  document.getElementById('steps-grid').innerHTML = gridHtml;
 }
 
 // ── Cover user-select (Sales Engineer / Additional Resource) ──
@@ -1907,6 +2000,18 @@ document.getElementById('steps-grid').addEventListener('click', e => {
   const delBtn = e.target.closest('[data-delete-step]');
   if (delBtn) { e.stopPropagation(); openDeleteModal('step', delBtn.dataset.deleteStep); return; }
 
+  const addRoundBtn = e.target.closest('[data-add-round]');
+  if (addRoundBtn) { addStepRound(addRoundBtn.dataset.addRound); return; }
+
+  const removeRoundBtn = e.target.closest('[data-remove-round]');
+  if (removeRoundBtn) {
+    e.stopPropagation();
+    const ts      = parseInt(removeRoundBtn.dataset.removeRound, 10);
+    const stageId = removeRoundBtn.dataset.roundStage;
+    if (confirm('Remove this round and all its progress?')) removeStepRound(stageId, ts);
+    return;
+  }
+
   const addBtn = e.target.closest('[data-add-step]');
   if (addBtn) { openModal('step', addBtn.dataset.addStep); return; }
 
@@ -1925,7 +2030,11 @@ document.getElementById('steps-grid').addEventListener('click', e => {
 // Reset buttons
 document.getElementById('reset-stage-btn').addEventListener('click', () => {
   const stage = STAGES.find(s => s.id === state.activeStageId);
-  effectiveSteps(stage).forEach(s => state.stepsUsed.delete(s.id));
+  const stepsForStage = effectiveSteps(stage);
+  stepsForStage.forEach(s => state.stepsUsed.delete(s.id));
+  (state.stepRounds?.[stage.id] || []).forEach(ts => {
+    stepsForStage.forEach(s => state.stepsUsed.delete(`${s.id}__${ts}`));
+  });
   saveCurrentOpp();
   render();
 });
