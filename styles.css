@@ -2540,6 +2540,32 @@ body {
 #modal-body .optional { font-weight: 400; color: #94a3b8; }
 
 #modal-body-section.hidden { display: none; }
+#modal-prompt-desc-section.hidden { display: none; }
+
+/* Quill editor inside add-prompt description field */
+#modal-prompt-desc-editor .ql-toolbar {
+  border-radius: 8px 8px 0 0;
+  border-color: #e2e8f0;
+  background: #fafbfc;
+  padding: 5px 10px;
+}
+#modal-prompt-desc-editor .ql-container {
+  border-radius: 0 0 8px 8px;
+  border-color: #e2e8f0;
+  font-size: 13px;
+  font-family: inherit;
+}
+#modal-prompt-desc-editor .ql-editor {
+  min-height: 80px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  line-height: 1.55;
+}
+#modal-prompt-desc-editor:focus-within .ql-toolbar,
+#modal-prompt-desc-editor:focus-within .ql-container {
+  border-color: #a5b4fc;
+}
 
 #modal-input-title,
 #modal-input-body {

@@ -1561,6 +1561,10 @@ function openModal(type, targetId) {
 
   document.getElementById('modal-body-section').classList.toggle('hidden', isOpp);
 
+  // Description field — only for new prompts (not steps, step-edit, or opportunity)
+  const isPromptAdd = !isOpp && !isStep && !isStepEdit;
+  document.getElementById('modal-prompt-desc-section').classList.toggle('hidden', !isPromptAdd);
+
   const isStepLike = isStep || isStepEdit;
   document.getElementById('modal-input-body').classList.toggle('hidden', isStepLike);
   document.getElementById('modal-step-body-editor').classList.toggle('hidden', !isStepLike);
@@ -1573,7 +1577,10 @@ function openModal(type, targetId) {
   } else {
     document.getElementById('modal-input-title').value = '';
     if (isStepLike) stepBodyQuill.setContents([]);
-    else document.getElementById('modal-input-body').value = '';
+    else {
+      document.getElementById('modal-input-body').value = '';
+      addPromptDescQuill.setContents([]);
+    }
   }
   document.getElementById('modal-input-title').classList.remove('error');
   document.querySelector('.modal-error-msg')?.classList.remove('visible');
@@ -1593,6 +1600,7 @@ function closeModal() {
   document.getElementById('modal-step-warning').classList.add('hidden');
   modal = { type: null, targetId: null };
   stepBodyQuill.setContents([]);
+  addPromptDescQuill.setContents([]);
 }
 
 function saveItem() {
@@ -1631,6 +1639,12 @@ function saveItem() {
     state.stepsAdded.push({ id, stageId: modal.targetId, title, body });
   } else {
     state.added.push({ id, condId: modal.targetId, title, body });
+    // If a description was entered, save it to promptEdits immediately
+    const explanation = quillToHtml(addPromptDescQuill);
+    if (explanation) {
+      state.promptEdits[id] = { title, explanation, body };
+      savePromptEdits();
+    }
   }
 
   saveCurrentOpp();
@@ -2370,6 +2384,12 @@ const QUILL_TOOLBAR = [
 const stepBodyQuill = new Quill('#modal-step-body-editor', {
   theme: 'snow',
   placeholder: 'Optional description or instructions…',
+  modules: { toolbar: QUILL_TOOLBAR },
+});
+
+const addPromptDescQuill = new Quill('#modal-prompt-desc-editor', {
+  theme: 'snow',
+  placeholder: 'Briefly explain the goal of this prompt so users know when to use it…',
   modules: { toolbar: QUILL_TOOLBAR },
 });
 
