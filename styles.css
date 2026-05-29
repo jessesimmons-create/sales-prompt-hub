@@ -714,6 +714,28 @@ body {
   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
 }
 
+/* Drag-and-drop reordering */
+.prompt-drag-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: #cbd5e1;
+  cursor: grab;
+  padding: 2px 0;
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+}
+.prompt-card:hover .prompt-drag-handle { opacity: 1; }
+.prompt-card:active .prompt-drag-handle { cursor: grabbing; }
+.prompt-drag-handle:hover { color: #94a3b8; }
+
+.prompt-card.dragging {
+  opacity: 0.4;
+  box-shadow: none;
+}
+.prompt-card.drop-left  { border-left:  3px solid #6366f1; }
+.prompt-card.drop-right { border-right: 3px solid #6366f1; }
+
 .prompt-card.used {
   background: #f0fdf4;
   border-color: #bbf7d0;

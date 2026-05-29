@@ -7,6 +7,7 @@ const SK = {
   users:        'sph_users',
   weights:      'sph_weights',
   promptEdits:  'sph_prompt_edits',
+  promptOrders: 'sph_prompt_orders',
   stepEdits:    'sph_step_edits',
   apiKey:       'sph_anthropic_key',
   opp: id => ({
@@ -105,6 +106,7 @@ const storedUsers   = JSON.parse(localStorage.getItem(SK.users)   || '[]');
 const storedEmail   = localStorage.getItem(SK.currentEmail) || '';
 const storedWeights      = JSON.parse(localStorage.getItem(SK.weights)      || '{}');
 const storedPromptEdits  = JSON.parse(localStorage.getItem(SK.promptEdits)  || '{}');
+const storedPromptOrders = JSON.parse(localStorage.getItem(SK.promptOrders) || '{}');
 const storedStepEdits    = JSON.parse(localStorage.getItem(SK.stepEdits)    || '{}');
 
 const state = {
@@ -119,6 +121,7 @@ const state = {
   role:            determineRole(storedEmail, storedUsers),
   weights:         storedWeights,
   promptEdits:     storedPromptEdits,
+  promptOrders:    storedPromptOrders,
   stepEdits:       storedStepEdits,
   stageSummaries:  {}, // in-memory only; { [stageId]: { loading, text, error, generatedAt } }
 };
@@ -233,6 +236,10 @@ function setStepWeight(dealType, stepId, weight) {
 
 function savePromptEdits() {
   localStorage.setItem(SK.promptEdits, JSON.stringify(state.promptEdits));
+}
+
+function savePromptOrders() {
+  localStorage.setItem(SK.promptOrders, JSON.stringify(state.promptOrders));
 }
 
 // Merges a base prompt with any global admin edits
@@ -935,7 +942,14 @@ function renderAttachmentsModal() {
 function effectivePrompts(cond) {
   const base   = cond.prompts.filter(p => !state.removed.has(p.id));
   const custom = state.added.filter(p => p.condId === cond.id);
-  return [...base, ...custom];
+  const all    = [...base, ...custom];
+  const order  = state.promptOrders?.[cond.id];
+  if (!order || order.length === 0) return all;
+  // Apply saved order, append any prompts not yet in the order at the end
+  return [
+    ...order.map(id => all.find(p => p.id === id)).filter(Boolean),
+    ...all.filter(p => !order.includes(p.id)),
+  ];
 }
 
 function effectiveSteps(stage) {
@@ -1194,8 +1208,19 @@ function renderPrompts(stage) {
         ? `<div class="prompt-body prompt-no-desc">No description yet — click to edit.</div>`
         : '';
     return `
-      <div class="prompt-card ${cardCls}" data-prompt="${p.id}">
+      <div class="prompt-card ${cardCls}" data-prompt="${p.id}"${isAdmin ? ' draggable="true"' : ''}>
         <div class="prompt-card-top">
+          ${isAdmin ? `
+          <span class="prompt-drag-handle" title="Drag to reorder">
+            <svg width="10" height="14" viewBox="0 0 10 14" fill="none">
+              <circle cx="3" cy="2.5" r="1.2" fill="currentColor"/>
+              <circle cx="7" cy="2.5" r="1.2" fill="currentColor"/>
+              <circle cx="3" cy="7"   r="1.2" fill="currentColor"/>
+              <circle cx="7" cy="7"   r="1.2" fill="currentColor"/>
+              <circle cx="3" cy="11.5" r="1.2" fill="currentColor"/>
+              <circle cx="7" cy="11.5" r="1.2" fill="currentColor"/>
+            </svg>
+          </span>` : ''}
           <span class="prompt-title">${escHtml(ep.title)}</span>
           ${hasCopy ? `
           <span class="prompt-copy-badge" title="Click to copy prompt to clipboard">
@@ -1950,6 +1975,7 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
 
   const card = e.target.closest('.prompt-card');
   if (!card) return;
+  if (e.target.closest('.prompt-drag-handle')) return; // drag handle — not a click action
   const id = card.dataset.prompt;
 
   if (state.role === 'admin') {
@@ -1967,6 +1993,83 @@ document.getElementById('prompts-grid').addEventListener('click', e => {
       setTimeout(() => freshCard.classList.remove('prompt-copied'), 1300);
     }
   }
+});
+
+// Prompt drag-and-drop reordering (admin only)
+let draggingPromptId = null;
+
+document.getElementById('prompts-grid').addEventListener('dragstart', e => {
+  if (state.role !== 'admin') return;
+  const card = e.target.closest('.prompt-card[data-prompt]');
+  if (!card) { e.preventDefault(); return; }
+  draggingPromptId = card.dataset.prompt;
+  card.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggingPromptId);
+});
+
+document.getElementById('prompts-grid').addEventListener('dragover', e => {
+  if (!draggingPromptId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  // Highlight the card being hovered as a drop target
+  document.querySelectorAll('#prompts-grid .drop-left, #prompts-grid .drop-right').forEach(el => {
+    el.classList.remove('drop-left', 'drop-right');
+  });
+  const card = e.target.closest('.prompt-card[data-prompt]');
+  if (!card || card.dataset.prompt === draggingPromptId) return;
+  const rect = card.getBoundingClientRect();
+  card.classList.add(e.clientX < rect.left + rect.width / 2 ? 'drop-left' : 'drop-right');
+});
+
+document.getElementById('prompts-grid').addEventListener('dragleave', e => {
+  if (!e.relatedTarget || !e.currentTarget.contains(e.relatedTarget)) {
+    document.querySelectorAll('#prompts-grid .drop-left, #prompts-grid .drop-right').forEach(el => {
+      el.classList.remove('drop-left', 'drop-right');
+    });
+  }
+});
+
+document.getElementById('prompts-grid').addEventListener('drop', e => {
+  e.preventDefault();
+  document.querySelectorAll('#prompts-grid .drop-left, #prompts-grid .drop-right').forEach(el => {
+    el.classList.remove('drop-left', 'drop-right');
+  });
+  if (!draggingPromptId) return;
+  const targetCard = e.target.closest('.prompt-card[data-prompt]');
+  if (!targetCard) return;
+  const targetId = targetCard.dataset.prompt;
+  if (targetId === draggingPromptId) return;
+
+  const stage = STAGES.find(s => s.id === state.activeStageId);
+  const cond  = stage?.conditions.find(c => c.id === state.activeCondId);
+  if (!cond) return;
+
+  // Get the current ordered list of IDs
+  let ids = effectivePrompts(cond).map(p => p.id);
+  const fromIdx = ids.indexOf(draggingPromptId);
+  const toIdx   = ids.indexOf(targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+
+  // Remove dragged item, re-insert before or after target based on mouse position
+  const rect        = targetCard.getBoundingClientRect();
+  const insertBefore = e.clientX < rect.left + rect.width / 2;
+  ids.splice(fromIdx, 1);
+  const newTo = ids.indexOf(targetId);
+  ids.splice(insertBefore ? newTo : newTo + 1, 0, draggingPromptId);
+
+  if (!state.promptOrders) state.promptOrders = {};
+  state.promptOrders[cond.id] = ids;
+  savePromptOrders();
+  draggingPromptId = null;
+  render();
+});
+
+document.getElementById('prompts-grid').addEventListener('dragend', () => {
+  draggingPromptId = null;
+  document.querySelectorAll('#prompts-grid .dragging, #prompts-grid .drop-left, #prompts-grid .drop-right').forEach(el => {
+    el.classList.remove('dragging', 'drop-left', 'drop-right');
+  });
 });
 
 // Steps grid
