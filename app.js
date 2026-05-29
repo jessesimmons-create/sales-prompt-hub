@@ -499,8 +499,6 @@ function renderStageSummary(stage) {
 
   const { total: sTotal, used: sUsed } = stepStats(stage);
 
-  const savedNotes = state.stageNotes?.[stage.id] || '';
-
   document.getElementById('stage-summary-view').innerHTML = `
     <div class="ss-container">
 
@@ -519,8 +517,7 @@ function renderStageSummary(stage) {
           <h3 class="ss-card-title">Deal Notes</h3>
         </div>
         <div class="ss-notes-body">
-          <textarea class="ss-notes-textarea" id="ss-notes-textarea"
-                    placeholder="Notes, observations, or anything relevant to this stage…">${escHtml(savedNotes)}</textarea>
+          <div id="ss-notes-editor"></div>
         </div>
       </div>
 
@@ -562,12 +559,22 @@ function renderStageSummary(stage) {
     renderStageSummary(stage);
   });
 
-  // Deal Notes — auto-save on input
-  document.getElementById('ss-notes-textarea')?.addEventListener('input', e => {
-    if (!state.stageNotes) state.stageNotes = {};
-    state.stageNotes[stage.id] = e.target.value;
-    saveCurrentOpp();
-  });
+  // Deal Notes — Quill rich text editor
+  const notesEditorEl = document.getElementById('ss-notes-editor');
+  if (notesEditorEl) {
+    const notesQuill = new Quill('#ss-notes-editor', {
+      theme: 'snow',
+      placeholder: 'Notes, observations, or anything relevant to this stage…',
+      modules: { toolbar: QUILL_TOOLBAR },
+    });
+    const savedNotes = state.stageNotes?.[stage.id] || '';
+    if (savedNotes) notesQuill.clipboard.dangerouslyPasteHTML(savedNotes);
+    notesQuill.on('text-change', () => {
+      if (!state.stageNotes) state.stageNotes = {};
+      state.stageNotes[stage.id] = quillToHtml(notesQuill);
+      saveCurrentOpp();
+    });
+  }
 
   // Completed step rows → open card detail
   document.getElementById('stage-summary-view').querySelectorAll('[data-ss-open-step]').forEach(row => {
