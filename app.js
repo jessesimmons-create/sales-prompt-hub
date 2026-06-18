@@ -13,6 +13,7 @@ const SK = {
   ecAdded:      'sph_ec_added',
   ecRemoved:    'sph_ec_removed',
   ecWeights:    'sph_ec_weights',
+  ecOrders:     'sph_ec_orders',
   apiKey:       'sph_anthropic_key',
   opp: id => ({
     added:        `sph_${id}_added`,
@@ -119,6 +120,7 @@ const storedEcEdits      = JSON.parse(localStorage.getItem(SK.ecEdits)      || '
 const storedEcAdded      = JSON.parse(localStorage.getItem(SK.ecAdded)      || '[]');
 const storedEcRemoved    = new Set(JSON.parse(localStorage.getItem(SK.ecRemoved) || '[]'));
 const storedEcWeights    = JSON.parse(localStorage.getItem(SK.ecWeights)    || '{}');
+const storedEcOrders     = JSON.parse(localStorage.getItem(SK.ecOrders)     || '{}');
 
 const state = {
   opps,
@@ -138,6 +140,7 @@ const state = {
   ecAdded:         storedEcAdded,
   ecRemoved:       storedEcRemoved,
   ecWeights:       storedEcWeights,
+  ecOrders:        storedEcOrders,
   stageSummaries:  {}, // in-memory only; { [stageId]: { loading, text, error, generatedAt } }
 };
 
@@ -291,6 +294,7 @@ function saveEcEdits()   { localStorage.setItem(SK.ecEdits,   JSON.stringify(sta
 function saveEcAdded()   { localStorage.setItem(SK.ecAdded,   JSON.stringify(state.ecAdded)); }
 function saveEcRemoved() { localStorage.setItem(SK.ecRemoved, JSON.stringify([...state.ecRemoved])); }
 function saveEcWeights() { localStorage.setItem(SK.ecWeights, JSON.stringify(state.ecWeights)); }
+function saveEcOrders() { localStorage.setItem(SK.ecOrders, JSON.stringify(state.ecOrders)); }
 
 function getEcWeight(ecId) { return state.ecWeights[ecId] ?? 1; }
 
@@ -310,10 +314,16 @@ function ecProgress(stage) {
 function effectiveExitCriteria(stage) {
   const base   = (stage.exitCriteria || []).filter(ec => !state.ecRemoved.has(ec.id));
   const custom = state.ecAdded.filter(ec => ec.stageId === stage.id);
-  return [...base, ...custom].map(ec => ({
+  const all    = [...base, ...custom].map(ec => ({
     ...ec,
     title: state.ecEdits[ec.id]?.title ?? ec.title,
   }));
+  const order = state.ecOrders?.[stage.id];
+  if (!order) return all;
+  const byId = Object.fromEntries(all.map(ec => [ec.id, ec]));
+  const ordered = order.filter(id => byId[id]).map(id => byId[id]);
+  const rest    = all.filter(ec => !order.includes(ec.id));
+  return [...ordered, ...rest];
 }
 
 function getEffectiveStep(s) {
@@ -632,7 +642,17 @@ function renderStageSummary(stage) {
 
     return `
       <div class="ss-ec-row ${done ? 'done' : ''} ${editingEcWeightId === ec.id ? 'weight-editing' : ''}"
-           data-toggle-ec="${ec.id}">
+           data-toggle-ec="${ec.id}" ${isAdmin ? `draggable="true" data-ec-drag="${ec.id}"` : ''}>
+        ${isAdmin ? `<span class="ss-ec-drag-handle" title="Drag to reorder">
+          <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
+            <circle cx="2" cy="2"  r="1.2" fill="currentColor"/>
+            <circle cx="6" cy="2"  r="1.2" fill="currentColor"/>
+            <circle cx="2" cy="6"  r="1.2" fill="currentColor"/>
+            <circle cx="6" cy="6"  r="1.2" fill="currentColor"/>
+            <circle cx="2" cy="10" r="1.2" fill="currentColor"/>
+            <circle cx="6" cy="10" r="1.2" fill="currentColor"/>
+          </svg>
+        </span>` : ''}
         <div class="ss-ec-check">
           <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
             <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
@@ -763,7 +783,7 @@ function renderStageSummary(stage) {
   // Exit criteria — toggle done (ignore clicks on admin action buttons)
   document.getElementById('stage-summary-view').querySelectorAll('[data-toggle-ec]').forEach(row => {
     row.addEventListener('click', e => {
-      if (e.target.closest('[data-ec-edit],[data-ec-delete],[data-ec-weight-edit],[data-ec-weight-save],[data-ec-weight-cancel],[data-ec-weight-id]')) return;
+      if (e.target.closest('[data-ec-edit],[data-ec-delete],[data-ec-weight-edit],[data-ec-weight-save],[data-ec-weight-cancel],[data-ec-weight-id],[data-ec-drag],.ss-ec-drag-handle')) return;
       const id = row.dataset.toggleEc;
       if (state.exitCriteriaDone.has(id)) state.exitCriteriaDone.delete(id);
       else state.exitCriteriaDone.add(id);
@@ -897,6 +917,65 @@ function renderStageSummary(stage) {
       if (e.key === 'Escape') { editingEcWeightId = null; renderStageSummary(stage); }
     });
   });
+
+  // EC drag-and-drop reordering (admin only)
+  if (isAdmin) {
+    let draggingEcId = null;
+    const ecList = document.querySelector('.ss-ec-list');
+    if (ecList) {
+      ecList.addEventListener('dragstart', e => {
+        const row = e.target.closest('[data-ec-drag]');
+        if (!row) return;
+        draggingEcId = row.dataset.ecDrag;
+        row.classList.add('ec-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', draggingEcId);
+      });
+      ecList.addEventListener('dragover', e => {
+        if (!draggingEcId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        ecList.querySelectorAll('.ec-drop-above, .ec-drop-below').forEach(el => el.classList.remove('ec-drop-above', 'ec-drop-below'));
+        const row = e.target.closest('[data-ec-drag]');
+        if (!row || row.dataset.ecDrag === draggingEcId) return;
+        const rect = row.getBoundingClientRect();
+        row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'ec-drop-above' : 'ec-drop-below');
+      });
+      ecList.addEventListener('dragleave', e => {
+        if (!ecList.contains(e.relatedTarget)) {
+          ecList.querySelectorAll('.ec-drop-above, .ec-drop-below').forEach(el => el.classList.remove('ec-drop-above', 'ec-drop-below'));
+        }
+      });
+      ecList.addEventListener('drop', e => {
+        e.preventDefault();
+        ecList.querySelectorAll('.ec-drop-above, .ec-drop-below').forEach(el => el.classList.remove('ec-drop-above', 'ec-drop-below'));
+        if (!draggingEcId) return;
+        const targetRow = e.target.closest('[data-ec-drag]');
+        if (!targetRow || targetRow.dataset.ecDrag === draggingEcId) return;
+        const targetId = targetRow.dataset.ecDrag;
+        let ids = effectiveExitCriteria(stage).map(ec => ec.id);
+        const fromIdx = ids.indexOf(draggingEcId);
+        const toIdx   = ids.indexOf(targetId);
+        if (fromIdx === -1 || toIdx === -1) return;
+        const rect = targetRow.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+        ids.splice(fromIdx, 1);
+        const newTo = ids.indexOf(targetId);
+        ids.splice(insertBefore ? newTo : newTo + 1, 0, draggingEcId);
+        if (!state.ecOrders) state.ecOrders = {};
+        state.ecOrders[stage.id] = ids;
+        saveEcOrders();
+        draggingEcId = null;
+        renderStageSummary(stage);
+      });
+      ecList.addEventListener('dragend', () => {
+        draggingEcId = null;
+        ecList.querySelectorAll('.ec-dragging, .ec-drop-above, .ec-drop-below').forEach(el => {
+          el.classList.remove('ec-dragging', 'ec-drop-above', 'ec-drop-below');
+        });
+      });
+    }
+  }
 
   // Show more / collapse for AI summary text
   const summaryTextEl = document.getElementById('ss-text-content');

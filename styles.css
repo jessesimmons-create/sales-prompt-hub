@@ -3228,6 +3228,23 @@ body {
 }
 .ss-ec-add-btn:hover { border-color: #6366f1; color: #6366f1; }
 
+/* EC drag handle */
+.ss-ec-drag-handle {
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 0;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: grab;
+  flex-shrink: 0;
+  transition: opacity .15s;
+}
+.ss-ec-row:hover .ss-ec-drag-handle { opacity: 0.5; }
+.ss-ec-drag-handle:hover { opacity: 1 !important; }
+.ss-ec-row.ec-dragging { opacity: 0.4; }
+.ss-ec-row.ec-drop-above { box-shadow: 0 -2px 0 #6366f1; }
+.ss-ec-row.ec-drop-below { box-shadow: 0 2px 0 #6366f1; }
+
 /* EC weight badge */
 .ss-ec-weight-badge {
   font-size: 10px;
