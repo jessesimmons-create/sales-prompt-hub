@@ -9,6 +9,9 @@ const SK = {
   promptEdits:  'sph_prompt_edits',
   promptOrders: 'sph_prompt_orders',
   stepEdits:    'sph_step_edits',
+  ecEdits:      'sph_ec_edits',
+  ecAdded:      'sph_ec_added',
+  ecRemoved:    'sph_ec_removed',
   apiKey:       'sph_anthropic_key',
   opp: id => ({
     added:        `sph_${id}_added`,
@@ -111,6 +114,9 @@ const storedWeights      = JSON.parse(localStorage.getItem(SK.weights)      || '
 const storedPromptEdits  = JSON.parse(localStorage.getItem(SK.promptEdits)  || '{}');
 const storedPromptOrders = JSON.parse(localStorage.getItem(SK.promptOrders) || '{}');
 const storedStepEdits    = JSON.parse(localStorage.getItem(SK.stepEdits)    || '{}');
+const storedEcEdits      = JSON.parse(localStorage.getItem(SK.ecEdits)      || '{}');
+const storedEcAdded      = JSON.parse(localStorage.getItem(SK.ecAdded)      || '[]');
+const storedEcRemoved    = new Set(JSON.parse(localStorage.getItem(SK.ecRemoved) || '[]'));
 
 const state = {
   opps,
@@ -126,6 +132,9 @@ const state = {
   promptEdits:     storedPromptEdits,
   promptOrders:    storedPromptOrders,
   stepEdits:       storedStepEdits,
+  ecEdits:         storedEcEdits,
+  ecAdded:         storedEcAdded,
+  ecRemoved:       storedEcRemoved,
   stageSummaries:  {}, // in-memory only; { [stageId]: { loading, text, error, generatedAt } }
 };
 
@@ -273,6 +282,19 @@ function getEffectivePromptById(id) {
 
 function saveStepEdits() {
   localStorage.setItem(SK.stepEdits, JSON.stringify(state.stepEdits));
+}
+
+function saveEcEdits()   { localStorage.setItem(SK.ecEdits,   JSON.stringify(state.ecEdits)); }
+function saveEcAdded()   { localStorage.setItem(SK.ecAdded,   JSON.stringify(state.ecAdded)); }
+function saveEcRemoved() { localStorage.setItem(SK.ecRemoved, JSON.stringify([...state.ecRemoved])); }
+
+function effectiveExitCriteria(stage) {
+  const base   = (stage.exitCriteria || []).filter(ec => !state.ecRemoved.has(ec.id));
+  const custom = state.ecAdded.filter(ec => ec.stageId === stage.id);
+  return [...base, ...custom].map(ec => ({
+    ...ec,
+    title: state.ecEdits[ec.id]?.title ?? ec.title,
+  }));
 }
 
 function getEffectiveStep(s) {
@@ -548,25 +570,65 @@ function renderStageSummary(stage) {
   const { total: sTotal, used: sUsed } = stepStats(stage);
 
   // ── Exit Criteria section ────────────────────────────
-  const exitCriteria = stage.exitCriteria || [];
-  const ecDone  = exitCriteria.filter(ec => state.exitCriteriaDone.has(ec.id)).length;
-  const ecTotal = exitCriteria.length;
+  const isAdmin = state.role === 'admin';
+  const exitCriteria = effectiveExitCriteria(stage);
+  const ecDone    = exitCriteria.filter(ec => state.exitCriteriaDone.has(ec.id)).length;
+  const ecTotal   = exitCriteria.length;
   const ecAllDone = ecTotal > 0 && ecDone === ecTotal;
-  const ecHtml = exitCriteria.length === 0
+
+  const editIcon = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+    <path d="M8.5 1.5L10.5 3.5L3.5 10.5H1.5V8.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+  </svg>`;
+  const delIcon = `<svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`;
+
+  const ecRowsHtml = exitCriteria.map(ec => {
+    const done = state.exitCriteriaDone.has(ec.id);
+    if (isAdmin && editingEcId === ec.id) {
+      return `
+        <div class="ss-ec-edit-row">
+          <input class="ss-ec-input" type="text" value="${escHtml(ec.title)}"
+                 data-ec-edit-id="${ec.id}" autocomplete="off" />
+          <button class="ss-ec-save-btn" data-ec-save="${ec.id}" title="Save">✓</button>
+          <button class="ss-ec-cancel-btn" data-ec-cancel title="Cancel">✕</button>
+        </div>`;
+    }
+    return `
+      <div class="ss-ec-row ${done ? 'done' : ''}" data-toggle-ec="${ec.id}">
+        <div class="ss-ec-check">
+          <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
+            <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="ss-ec-title">${escHtml(ec.title)}</span>
+        ${isAdmin ? `
+        <button class="ss-ec-edit-btn" data-ec-edit="${ec.id}" title="Edit">${editIcon}</button>
+        <button class="ss-ec-del-btn"  data-ec-delete="${ec.id}" title="Remove">${delIcon}</button>
+        ` : ''}
+      </div>`;
+  }).join('');
+
+  const addRowHtml = isAdmin
+    ? (editingEcId === '__new__'
+        ? `<div class="ss-ec-edit-row">
+             <input class="ss-ec-input" type="text" placeholder="New criterion…"
+                    data-ec-edit-id="__new__" autocomplete="off" />
+             <button class="ss-ec-save-btn" data-ec-save="__new__" title="Save">✓</button>
+             <button class="ss-ec-cancel-btn" data-ec-cancel title="Cancel">✕</button>
+           </div>`
+        : `<button class="ss-ec-add-btn" data-ec-add="${stage.id}">
+             <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+               <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+             </svg>
+             Add Criterion
+           </button>`)
+    : '';
+
+  const ecHtml = exitCriteria.length === 0 && editingEcId !== '__new__'
     ? '<p class="ss-empty-steps">No exit criteria defined for this stage.</p>'
-    : exitCriteria.map(ec => {
-        const done = state.exitCriteriaDone.has(ec.id);
-        return `
-          <div class="ss-ec-row ${done ? 'done' : ''}" data-toggle-ec="${ec.id}">
-            <div class="ss-ec-check">
-              <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
-                <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
-                      stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-            <span class="ss-ec-title">${escHtml(ec.title)}</span>
-          </div>`;
-      }).join('');
+    : '';
 
   document.getElementById('stage-summary-view').innerHTML = `
     <div class="ss-container">
@@ -588,7 +650,7 @@ function renderStageSummary(stage) {
             ${ecDone} / ${ecTotal}
           </span>
         </div>
-        <div class="ss-ec-list">${ecHtml}</div>
+        <div class="ss-ec-list">${ecHtml}${ecRowsHtml}${addRowHtml}</div>
       </div>
 
       <div class="ss-card ss-notes-card">
@@ -660,14 +722,94 @@ function renderStageSummary(stage) {
     row.addEventListener('click', () => openCardDetail('step', row.dataset.ssOpenStep));
   });
 
-  // Exit criteria rows → toggle done state
+  // Exit criteria — toggle done (ignore clicks on admin action buttons)
   document.getElementById('stage-summary-view').querySelectorAll('[data-toggle-ec]').forEach(row => {
-    row.addEventListener('click', () => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('[data-ec-edit],[data-ec-delete]')) return;
       const id = row.dataset.toggleEc;
       if (state.exitCriteriaDone.has(id)) state.exitCriteriaDone.delete(id);
       else state.exitCriteriaDone.add(id);
       saveCurrentOpp();
       renderStageSummary(stage);
+    });
+  });
+
+  // Exit criteria — edit button → enter inline edit mode
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-edit]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      editingEcId = btn.dataset.ecEdit;
+      renderStageSummary(stage);
+      const input = document.querySelector('[data-ec-edit-id]');
+      if (input) { input.focus(); input.select(); }
+    });
+  });
+
+  // Exit criteria — save edit
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-save]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const ecId  = btn.dataset.ecSave;
+      const input = document.querySelector(`[data-ec-edit-id="${ecId}"]`);
+      const title = input?.value.trim();
+      if (title) {
+        if (ecId === '__new__') {
+          const id = 'ec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+          state.ecAdded.push({ id, stageId: stage.id, title });
+          saveEcAdded();
+        } else {
+          state.ecEdits[ecId] = { title };
+          saveEcEdits();
+        }
+      }
+      editingEcId = null;
+      renderStageSummary(stage);
+    });
+  });
+
+  // Exit criteria — cancel edit
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-cancel]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      editingEcId = null;
+      renderStageSummary(stage);
+    });
+  });
+
+  // Exit criteria — Enter/Escape in input
+  document.getElementById('stage-summary-view').querySelectorAll('.ss-ec-input').forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); input.closest('.ss-ec-edit-row').querySelector('[data-ec-save]').click(); }
+      if (e.key === 'Escape') { editingEcId = null; renderStageSummary(stage); }
+    });
+  });
+
+  // Exit criteria — delete
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-delete]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const ecId = btn.dataset.ecDelete;
+      if (state.ecAdded.some(ec => ec.id === ecId)) {
+        state.ecAdded = state.ecAdded.filter(ec => ec.id !== ecId);
+        saveEcAdded();
+      } else {
+        state.ecRemoved.add(ecId);
+        saveEcRemoved();
+      }
+      state.exitCriteriaDone.delete(ecId);
+      saveCurrentOpp();
+      renderStageSummary(stage);
+    });
+  });
+
+  // Exit criteria — add new
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-add]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      editingEcId = '__new__';
+      renderStageSummary(stage);
+      const input = document.querySelector('[data-ec-edit-id="__new__"]');
+      if (input) input.focus();
     });
   });
 
@@ -821,6 +963,8 @@ function renderUsersModal() {
       </button>
     </div>`; }).join('');
 }
+
+let editingEcId = null; // ID of EC item being inline-edited, or '__new__' for a new item
 
 // ── Comments ──────────────────────────────────────────
 

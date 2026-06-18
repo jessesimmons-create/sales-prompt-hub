@@ -3147,6 +3147,84 @@ body {
   text-decoration-color: #86efac;
 }
 
+/* Admin edit/delete buttons on EC rows */
+.ss-ec-edit-btn,
+.ss-ec-del-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-light);
+  opacity: 0;
+  transition: opacity .15s, background .12s, color .12s;
+  margin-left: auto;
+}
+.ss-ec-row:hover .ss-ec-edit-btn,
+.ss-ec-row:hover .ss-ec-del-btn  { opacity: 1; margin-left: 0; }
+.ss-ec-edit-btn + .ss-ec-del-btn  { margin-left: 2px; }
+.ss-ec-edit-btn:hover { background: #e2e8f0; color: #6366f1; }
+.ss-ec-del-btn:hover  { background: #fee2e2; color: #ef4444; }
+
+/* Inline edit row */
+.ss-ec-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.ss-ec-input {
+  flex: 1;
+  padding: 5px 9px;
+  border: 1.5px solid #a5b4fc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: white;
+  outline: none;
+}
+.ss-ec-input:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,.12); }
+
+.ss-ec-save-btn,
+.ss-ec-cancel-btn {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.ss-ec-save-btn   { background: #6366f1; color: white; border-color: #6366f1; }
+.ss-ec-save-btn:hover   { background: #4f46e5; }
+.ss-ec-cancel-btn { background: transparent; color: var(--text-muted); }
+.ss-ec-cancel-btn:hover { background: var(--main-bg); }
+
+/* Add criterion button */
+.ss-ec-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 100%;
+  transition: border-color .15s, color .15s;
+}
+.ss-ec-add-btn:hover { border-color: #6366f1; color: #6366f1; }
+
 /* AI body */
 
 .ss-ai-body {
