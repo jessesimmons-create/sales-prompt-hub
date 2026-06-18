@@ -660,11 +660,13 @@ function renderStageSummary(stage) {
           </svg>
         </div>
         <span class="ss-ec-title">${escHtml(ec.title)}</span>
-        ${weightBadge}
-        ${isAdmin && editingEcWeightId !== ec.id ? `
-        <button class="ss-ec-edit-btn" data-ec-edit="${ec.id}" title="Edit label">${editIcon}</button>
-        <button class="ss-ec-del-btn"  data-ec-delete="${ec.id}" title="Remove">${delIcon}</button>
-        ` : ''}
+        <span class="ss-ec-actions">
+          ${weightBadge}
+          ${isAdmin && editingEcWeightId !== ec.id ? `
+          <button class="ss-ec-edit-btn" data-ec-edit="${ec.id}" title="Edit label">${editIcon}</button>
+          <button class="ss-ec-del-btn"  data-ec-delete="${ec.id}" title="Remove">${delIcon}</button>
+          ` : ''}
+        </span>
       </div>`;
   }).join('');
 

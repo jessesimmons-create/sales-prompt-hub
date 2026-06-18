@@ -3246,6 +3246,14 @@ body {
 .ss-ec-row.ec-drop-below { box-shadow: 0 2px 0 #6366f1; }
 
 /* EC weight badge */
+.ss-ec-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .ss-ec-weight-badge {
   font-size: 10px;
   font-weight: 600;
@@ -3254,7 +3262,6 @@ body {
   background: var(--main-bg);
   color: var(--text-muted);
   border: 1px solid var(--border-color);
-  margin-left: auto;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -3278,7 +3285,6 @@ body {
   display: flex;
   align-items: center;
   gap: 3px;
-  margin-left: auto;
   flex-shrink: 0;
 }
 .ss-ec-weight-input {
