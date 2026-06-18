@@ -12,6 +12,7 @@ const SK = {
   ecEdits:      'sph_ec_edits',
   ecAdded:      'sph_ec_added',
   ecRemoved:    'sph_ec_removed',
+  ecWeights:    'sph_ec_weights',
   apiKey:       'sph_anthropic_key',
   opp: id => ({
     added:        `sph_${id}_added`,
@@ -117,6 +118,7 @@ const storedStepEdits    = JSON.parse(localStorage.getItem(SK.stepEdits)    || '
 const storedEcEdits      = JSON.parse(localStorage.getItem(SK.ecEdits)      || '{}');
 const storedEcAdded      = JSON.parse(localStorage.getItem(SK.ecAdded)      || '[]');
 const storedEcRemoved    = new Set(JSON.parse(localStorage.getItem(SK.ecRemoved) || '[]'));
+const storedEcWeights    = JSON.parse(localStorage.getItem(SK.ecWeights)    || '{}');
 
 const state = {
   opps,
@@ -135,6 +137,7 @@ const state = {
   ecEdits:         storedEcEdits,
   ecAdded:         storedEcAdded,
   ecRemoved:       storedEcRemoved,
+  ecWeights:       storedEcWeights,
   stageSummaries:  {}, // in-memory only; { [stageId]: { loading, text, error, generatedAt } }
 };
 
@@ -287,6 +290,22 @@ function saveStepEdits() {
 function saveEcEdits()   { localStorage.setItem(SK.ecEdits,   JSON.stringify(state.ecEdits)); }
 function saveEcAdded()   { localStorage.setItem(SK.ecAdded,   JSON.stringify(state.ecAdded)); }
 function saveEcRemoved() { localStorage.setItem(SK.ecRemoved, JSON.stringify([...state.ecRemoved])); }
+function saveEcWeights() { localStorage.setItem(SK.ecWeights, JSON.stringify(state.ecWeights)); }
+
+function getEcWeight(ecId) { return state.ecWeights[ecId] ?? 1; }
+
+function ecProgress(stage) {
+  const criteria = effectiveExitCriteria(stage);
+  if (criteria.length === 0) return { pct: 0, ecDone: 0, ecTotal: 0 };
+  const totalWeight = criteria.reduce((sum, ec) => sum + getEcWeight(ec.id), 0);
+  const doneWeight  = criteria
+    .filter(ec => state.exitCriteriaDone.has(ec.id))
+    .reduce((sum, ec) => sum + getEcWeight(ec.id), 0);
+  const pct   = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0;
+  const ecDone  = criteria.filter(ec => state.exitCriteriaDone.has(ec.id)).length;
+  const ecTotal = criteria.length;
+  return { pct, ecDone, ecTotal };
+}
 
 function effectiveExitCriteria(stage) {
   const base   = (stage.exitCriteria || []).filter(ec => !state.ecRemoved.has(ec.id));
@@ -572,8 +591,7 @@ function renderStageSummary(stage) {
   // ── Exit Criteria section ────────────────────────────
   const isAdmin = state.role === 'admin';
   const exitCriteria = effectiveExitCriteria(stage);
-  const ecDone    = exitCriteria.filter(ec => state.exitCriteriaDone.has(ec.id)).length;
-  const ecTotal   = exitCriteria.length;
+  const { pct: ecPct, ecDone, ecTotal } = ecProgress(stage);
   const ecAllDone = ecTotal > 0 && ecDone === ecTotal;
 
   const editIcon = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none">
@@ -584,7 +602,10 @@ function renderStageSummary(stage) {
   </svg>`;
 
   const ecRowsHtml = exitCriteria.map(ec => {
-    const done = state.exitCriteriaDone.has(ec.id);
+    const done   = state.exitCriteriaDone.has(ec.id);
+    const weight = getEcWeight(ec.id);
+
+    // Text editing mode
     if (isAdmin && editingEcId === ec.id) {
       return `
         <div class="ss-ec-edit-row">
@@ -594,8 +615,24 @@ function renderStageSummary(stage) {
           <button class="ss-ec-cancel-btn" data-ec-cancel title="Cancel">✕</button>
         </div>`;
     }
+
+    // Weight editing mode (inline number input replacing the badge)
+    const weightBadge = editingEcWeightId === ec.id
+      ? `<span class="ss-ec-weight-wrap">
+           <input class="ss-ec-weight-input" type="number" min="0.1" step="0.1"
+                  value="${weight}" data-ec-weight-id="${ec.id}" />
+           <button class="ss-ec-save-btn ss-ec-weight-save" data-ec-weight-save="${ec.id}" title="Save">✓</button>
+           <button class="ss-ec-cancel-btn ss-ec-weight-cancel" data-ec-weight-cancel title="Cancel">✕</button>
+         </span>`
+      : (isAdmin || weight !== 1)
+        ? `<span class="ss-ec-weight-badge ${isAdmin ? 'clickable' : ''} ${weight !== 1 ? 'weighted' : ''}"
+                ${isAdmin ? `data-ec-weight-edit="${ec.id}"` : ''}
+                title="${isAdmin ? 'Click to set weight' : `Weight: ${weight}`}">×${weight}</span>`
+        : '';
+
     return `
-      <div class="ss-ec-row ${done ? 'done' : ''}" data-toggle-ec="${ec.id}">
+      <div class="ss-ec-row ${done ? 'done' : ''} ${editingEcWeightId === ec.id ? 'weight-editing' : ''}"
+           data-toggle-ec="${ec.id}">
         <div class="ss-ec-check">
           <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
             <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
@@ -603,8 +640,9 @@ function renderStageSummary(stage) {
           </svg>
         </div>
         <span class="ss-ec-title">${escHtml(ec.title)}</span>
-        ${isAdmin ? `
-        <button class="ss-ec-edit-btn" data-ec-edit="${ec.id}" title="Edit">${editIcon}</button>
+        ${weightBadge}
+        ${isAdmin && editingEcWeightId !== ec.id ? `
+        <button class="ss-ec-edit-btn" data-ec-edit="${ec.id}" title="Edit label">${editIcon}</button>
         <button class="ss-ec-del-btn"  data-ec-delete="${ec.id}" title="Remove">${delIcon}</button>
         ` : ''}
       </div>`;
@@ -646,8 +684,8 @@ function renderStageSummary(stage) {
       <div class="ss-card ss-ec-card">
         <div class="ss-card-header">
           <h3 class="ss-card-title">Exit Criteria</h3>
-          <span class="ss-count-badge" style="color:${ecAllDone ? '#22c55e' : 'var(--text-muted)'}">
-            ${ecDone} / ${ecTotal}
+          <span class="ss-count-badge ${ecAllDone ? 'ec-done' : ''}" title="${ecDone} of ${ecTotal} complete">
+            ${ecPct}%
           </span>
         </div>
         <div class="ss-ec-list">${ecHtml}${ecRowsHtml}${addRowHtml}</div>
@@ -725,7 +763,7 @@ function renderStageSummary(stage) {
   // Exit criteria — toggle done (ignore clicks on admin action buttons)
   document.getElementById('stage-summary-view').querySelectorAll('[data-toggle-ec]').forEach(row => {
     row.addEventListener('click', e => {
-      if (e.target.closest('[data-ec-edit],[data-ec-delete]')) return;
+      if (e.target.closest('[data-ec-edit],[data-ec-delete],[data-ec-weight-edit],[data-ec-weight-save],[data-ec-weight-cancel],[data-ec-weight-id]')) return;
       const id = row.dataset.toggleEc;
       if (state.exitCriteriaDone.has(id)) state.exitCriteriaDone.delete(id);
       else state.exitCriteriaDone.add(id);
@@ -810,6 +848,53 @@ function renderStageSummary(stage) {
       renderStageSummary(stage);
       const input = document.querySelector('[data-ec-edit-id="__new__"]');
       if (input) input.focus();
+    });
+  });
+
+  // Weight badge click → enter weight edit mode
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-weight-edit]').forEach(badge => {
+    badge.addEventListener('click', e => {
+      e.stopPropagation();
+      editingEcWeightId = badge.dataset.ecWeightEdit;
+      editingEcId = null;
+      renderStageSummary(stage);
+      const input = document.querySelector('[data-ec-weight-id]');
+      if (input) { input.focus(); input.select(); }
+    });
+  });
+
+  // Weight save button
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-weight-save]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const ecId = btn.dataset.ecWeightSave;
+      const input = document.querySelector(`[data-ec-weight-id="${ecId}"]`);
+      if (input) {
+        const val = parseFloat(input.value);
+        if (!isNaN(val) && val > 0) {
+          state.ecWeights[ecId] = val;
+          saveEcWeights();
+        }
+      }
+      editingEcWeightId = null;
+      renderStageSummary(stage);
+    });
+  });
+
+  // Weight cancel button
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-weight-cancel]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      editingEcWeightId = null;
+      renderStageSummary(stage);
+    });
+  });
+
+  // Weight input keyboard
+  document.getElementById('stage-summary-view').querySelectorAll('[data-ec-weight-id]').forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.closest('.ss-ec-weight-wrap').querySelector('[data-ec-weight-save]').click(); }
+      if (e.key === 'Escape') { editingEcWeightId = null; renderStageSummary(stage); }
     });
   });
 
@@ -964,7 +1049,8 @@ function renderUsersModal() {
     </div>`; }).join('');
 }
 
-let editingEcId = null; // ID of EC item being inline-edited, or '__new__' for a new item
+let editingEcId       = null; // EC item text being edited, or '__new__'
+let editingEcWeightId = null; // EC item whose weight is being edited
 
 // ── Comments ──────────────────────────────────────────
 

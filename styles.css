@@ -3228,6 +3228,58 @@ body {
 }
 .ss-ec-add-btn:hover { border-color: #6366f1; color: #6366f1; }
 
+/* EC weight badge */
+.ss-ec-weight-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: var(--main-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  margin-left: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ss-ec-weight-badge.clickable {
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, background .15s;
+}
+.ss-ec-row:hover .ss-ec-weight-badge.clickable { opacity: 1; }
+.ss-ec-weight-badge.clickable:hover { background: #e0e7ff; color: #6366f1; border-color: #a5b4fc; }
+.ss-ec-weight-badge.weighted {
+  opacity: 1;
+  background: #ede9fe;
+  color: #7c3aed;
+  border-color: #c4b5fd;
+}
+.ss-ec-weight-badge.weighted.clickable:hover { background: #ddd6fe; }
+
+/* EC weight inline editor */
+.ss-ec-weight-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ss-ec-weight-input {
+  width: 52px;
+  padding: 2px 5px;
+  font-size: 12px;
+  border: 1px solid #a5b4fc;
+  border-radius: 5px;
+  background: white;
+  color: var(--text-color);
+  outline: none;
+  min-width: 0;
+}
+.ss-ec-weight-input:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,.15); }
+
+/* EC badge done color */
+.ss-count-badge.ec-done { color: #22c55e; }
+
 /* AI body */
 
 .ss-ai-body {
