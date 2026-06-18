@@ -3182,7 +3182,8 @@ body {
 
 .ss-ec-input {
   flex: 1;
-  padding: 5px 9px;
+  min-width: 0;
+  padding: 5px 8px;
   border: 1.5px solid #a5b4fc;
   border-radius: 6px;
   font-size: 13px;
@@ -3204,7 +3205,7 @@ body {
   transition: background .12s;
   line-height: 1;
 }
-.ss-ec-save-btn   { background: #6366f1; color: white; border-color: #6366f1; }
+.ss-ec-save-btn   { background: #6366f1; color: white; border-color: #6366f1; min-width: 24px; }
 .ss-ec-save-btn:hover   { background: #4f46e5; }
 .ss-ec-cancel-btn { background: transparent; color: var(--text-muted); }
 .ss-ec-cancel-btn:hover { background: var(--main-bg); }
