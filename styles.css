@@ -3093,7 +3093,7 @@ body {
 /* Exit Criteria */
 
 .ss-ec-list {
-  padding: 12px 16px;
+  padding: 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3175,8 +3175,9 @@ body {
 .ss-ec-edit-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 2px 0;
+  min-width: 0;
 }
 
 .ss-ec-input {
@@ -3195,12 +3196,13 @@ body {
 .ss-ec-save-btn,
 .ss-ec-cancel-btn {
   flex-shrink: 0;
-  padding: 4px 8px;
+  padding: 4px 7px;
   border-radius: 5px;
   border: 1px solid var(--border);
   font-size: 12px;
   cursor: pointer;
   transition: background .12s;
+  line-height: 1;
 }
 .ss-ec-save-btn   { background: #6366f1; color: white; border-color: #6366f1; }
 .ss-ec-save-btn:hover   { background: #4f46e5; }
