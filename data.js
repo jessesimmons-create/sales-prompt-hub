@@ -4,6 +4,12 @@ const STAGES = [
     name: 'Prospecting',
     icon: '🔭',
     color: '#f97316',
+    exitCriteria: [
+      { id: 'ec-pro-1', title: 'ICP fit confirmed' },
+      { id: 'ec-pro-2', title: 'Key decision-maker identified and contact info validated' },
+      { id: 'ec-pro-3', title: 'Personalized outreach sent and logged in CRM' },
+      { id: 'ec-pro-4', title: 'Positive response received or meeting scheduled' },
+    ],
     steps: [
       { id: 'stp-pro-1', title: 'Define ideal customer profile and target account list' },
       { id: 'stp-pro-2', title: 'Research prospect and identify key contacts' },
@@ -50,6 +56,13 @@ const STAGES = [
     name: 'Prep Strat',
     icon: '🎯',
     color: '#6366f1',
+    exitCriteria: [
+      { id: 'ec-ps-1', title: 'Company background and recent news researched' },
+      { id: 'ec-ps-2', title: 'Key stakeholders and org chart mapped' },
+      { id: 'ec-ps-3', title: 'Competitive landscape documented' },
+      { id: 'ec-ps-4', title: 'ICP fit and success criteria defined' },
+      { id: 'ec-ps-5', title: 'Pre-call agenda sent to prospect' },
+    ],
     steps: [
       { id: 'stp-ps-1', title: 'Research company background and recent news' },
       { id: 'stp-ps-2', title: 'Identify key stakeholders and org chart' },
@@ -84,6 +97,14 @@ const STAGES = [
     name: 'Discovery',
     icon: '🔍',
     color: '#0ea5e9',
+    exitCriteria: [
+      { id: 'ec-d-1', title: 'Pain points and business challenges clearly identified' },
+      { id: 'ec-d-2', title: 'Champion identified and confirmed' },
+      { id: 'ec-d-3', title: 'Decision-making process and stakeholders understood' },
+      { id: 'ec-d-4', title: 'Budget authority and range confirmed' },
+      { id: 'ec-d-5', title: 'Timeline and urgency established' },
+      { id: 'ec-d-6', title: 'Follow-up summary sent within 24 hours' },
+    ],
     steps: [
       { id: 'stp-d-1', title: 'Send pre-call agenda to prospect' },
       { id: 'stp-d-2', title: 'Confirm attendees and roles' },
@@ -117,6 +138,13 @@ const STAGES = [
     name: 'Demo',
     icon: '🖥️',
     color: '#8b5cf6',
+    exitCriteria: [
+      { id: 'ec-dm-1', title: 'Demo tailored to prospect\'s specific use case' },
+      { id: 'ec-dm-2', title: 'Key stakeholders attended the demo' },
+      { id: 'ec-dm-3', title: 'Technical objections addressed' },
+      { id: 'ec-dm-4', title: 'Post-demo recap and next steps sent' },
+      { id: 'ec-dm-5', title: 'Prospect expressed positive intent to move forward' },
+    ],
     steps: [
       { id: 'stp-dm-1', title: 'Customize demo environment to prospect use case' },
       { id: 'stp-dm-2', title: 'Confirm attendees and send agenda' },
@@ -160,6 +188,13 @@ const STAGES = [
     name: 'Decision',
     icon: '⚖️',
     color: '#f59e0b',
+    exitCriteria: [
+      { id: 'ec-dec-1', title: 'Decision criteria and weighting documented' },
+      { id: 'ec-dec-2', title: 'Tailored business case delivered' },
+      { id: 'ec-dec-3', title: 'Executive sponsor engaged' },
+      { id: 'ec-dec-4', title: 'Competitive differentiation clearly established' },
+      { id: 'ec-dec-5', title: 'Decision timeline and next step confirmed' },
+    ],
     steps: [
       { id: 'stp-dec-1', title: 'Confirm decision criteria and weighting' },
       { id: 'stp-dec-2', title: 'Deliver tailored business case' },
@@ -202,6 +237,12 @@ const STAGES = [
     name: 'Verbal Yes',
     icon: '🤝',
     color: '#10b981',
+    exitCriteria: [
+      { id: 'ec-vy-1', title: 'Verbal commitment confirmed in writing to champion' },
+      { id: 'ec-vy-2', title: 'Mutual close plan shared and agreed upon' },
+      { id: 'ec-vy-3', title: 'Internal approvals and sign-off process identified' },
+      { id: 'ec-vy-4', title: 'Contract / order form process initiated' },
+    ],
     steps: [
       { id: 'stp-vy-1', title: 'Send verbal confirmation email to champion' },
       { id: 'stp-vy-2', title: 'Build and share mutual close plan' },
@@ -234,6 +275,13 @@ const STAGES = [
     name: 'Procurement / Legal',
     icon: '📋',
     color: '#06b6d4',
+    exitCriteria: [
+      { id: 'ec-pr-1', title: 'Order form / MSA sent to procurement' },
+      { id: 'ec-pr-2', title: 'Legal reviewer and POC identified' },
+      { id: 'ec-pr-3', title: 'All redlines reviewed and resolved' },
+      { id: 'ec-pr-4', title: 'Signature authority confirmed' },
+      { id: 'ec-pr-5', title: 'Signed agreement received' },
+    ],
     steps: [
       { id: 'stp-pr-1', title: 'Send order form / MSA to procurement' },
       { id: 'stp-pr-2', title: 'Confirm legal reviewer and point of contact' },
@@ -276,6 +324,12 @@ const STAGES = [
     name: 'No Show',
     icon: '📵',
     color: '#ef4444',
+    exitCriteria: [
+      { id: 'ec-ns-1', title: 'Reschedule outreach sent within 15 minutes' },
+      { id: 'ec-ns-2', title: 'Follow-up sent at 24 hours' },
+      { id: 'ec-ns-3', title: 'Deal status re-qualified in CRM' },
+      { id: 'ec-ns-4', title: 'New meeting confirmed or deal marked inactive' },
+    ],
     steps: [
       { id: 'stp-ns-1', title: 'Send reschedule message within 15 minutes' },
       { id: 'stp-ns-2', title: 'Follow up again at 24 hours' },
@@ -307,6 +361,12 @@ const STAGES = [
     name: 'Closed',
     icon: '🏁',
     color: '#64748b',
+    exitCriteria: [
+      { id: 'ec-cl-1', title: 'CRM updated and opportunity closed' },
+      { id: 'ec-cl-2', title: 'CS team briefed and kickoff scheduled' },
+      { id: 'ec-cl-3', title: 'Internal win / loss notification sent' },
+      { id: 'ec-cl-4', title: 'Key learnings documented in deal notes' },
+    ],
     steps: [
       { id: 'stp-cl-1', title: 'Update CRM and close opportunity' },
       { id: 'stp-cl-2', title: 'Brief CS team and schedule kickoff' },

@@ -19,8 +19,9 @@ const SK = {
     comments:     `sph_${id}_comments`,
     cover:        `sph_${id}_cover`,
     attachments:  `sph_${id}_attachments`,
-    stageNotes:   `sph_${id}_stage_notes`,
-    stepRounds:   `sph_${id}_step_rounds`,
+    stageNotes:    `sph_${id}_stage_notes`,
+    stepRounds:    `sph_${id}_step_rounds`,
+    exitCriteria:  `sph_${id}_exit_criteria`,
   }),
 };
 
@@ -59,6 +60,7 @@ function loadOppState(id) {
     attachments:       JSON.parse(localStorage.getItem(k.attachments)  || '[]'),
     stageNotes:        JSON.parse(localStorage.getItem(k.stageNotes)   || '{}'),
     stepRounds:        JSON.parse(localStorage.getItem(k.stepRounds)   || '{}'),
+    exitCriteriaDone:  new Set(JSON.parse(localStorage.getItem(k.exitCriteria) || '[]')),
   };
 }
 
@@ -73,6 +75,7 @@ function saveCurrentOpp() {
   localStorage.setItem(k.cover,        JSON.stringify(state.cover));
   localStorage.setItem(k.stageNotes,   JSON.stringify(state.stageNotes));
   localStorage.setItem(k.stepRounds,   JSON.stringify(state.stepRounds || {}));
+  localStorage.setItem(k.exitCriteria, JSON.stringify([...(state.exitCriteriaDone || [])]));
   try {
     localStorage.setItem(k.attachments, JSON.stringify(state.attachments));
   } catch (e) {
@@ -153,9 +156,10 @@ function createOpp(name) {
   state.comments      = [];
   state.cover         = { opportunityOwner: state.currentEmail };
   state.attachments   = [];
-  state.stageNotes    = {};
-  state.stepRounds    = {};
-  state.activeStageId = '__cover__';
+  state.stageNotes       = {};
+  state.stepRounds       = {};
+  state.exitCriteriaDone = new Set();
+  state.activeStageId    = '__cover__';
   localStorage.setItem(SK.activeOpp, id);
   saveCurrentOpp();
   state.oppDropdownOpen = false;
@@ -543,6 +547,27 @@ function renderStageSummary(stage) {
 
   const { total: sTotal, used: sUsed } = stepStats(stage);
 
+  // ── Exit Criteria section ────────────────────────────
+  const exitCriteria = stage.exitCriteria || [];
+  const ecDone  = exitCriteria.filter(ec => state.exitCriteriaDone.has(ec.id)).length;
+  const ecTotal = exitCriteria.length;
+  const ecAllDone = ecTotal > 0 && ecDone === ecTotal;
+  const ecHtml = exitCriteria.length === 0
+    ? '<p class="ss-empty-steps">No exit criteria defined for this stage.</p>'
+    : exitCriteria.map(ec => {
+        const done = state.exitCriteriaDone.has(ec.id);
+        return `
+          <div class="ss-ec-row ${done ? 'done' : ''}" data-toggle-ec="${ec.id}">
+            <div class="ss-ec-check">
+              <svg viewBox="0 0 11 11" fill="none" width="10" height="10">
+                <path d="M1.5 5.5L4.5 8.5L9.5 2.5" stroke="white" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="ss-ec-title">${escHtml(ec.title)}</span>
+          </div>`;
+      }).join('');
+
   document.getElementById('stage-summary-view').innerHTML = `
     <div class="ss-container">
 
@@ -554,6 +579,16 @@ function renderStageSummary(stage) {
           </span>
         </div>
         <div class="ss-steps-list">${stepsHtml}</div>
+      </div>
+
+      <div class="ss-card ss-ec-card">
+        <div class="ss-card-header">
+          <h3 class="ss-card-title">Exit Criteria</h3>
+          <span class="ss-count-badge" style="color:${ecAllDone ? '#22c55e' : 'var(--text-muted)'}">
+            ${ecDone} / ${ecTotal}
+          </span>
+        </div>
+        <div class="ss-ec-list">${ecHtml}</div>
       </div>
 
       <div class="ss-card ss-notes-card">
@@ -623,6 +658,17 @@ function renderStageSummary(stage) {
   // Completed step rows → open card detail
   document.getElementById('stage-summary-view').querySelectorAll('[data-ss-open-step]').forEach(row => {
     row.addEventListener('click', () => openCardDetail('step', row.dataset.ssOpenStep));
+  });
+
+  // Exit criteria rows → toggle done state
+  document.getElementById('stage-summary-view').querySelectorAll('[data-toggle-ec]').forEach(row => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.toggleEc;
+      if (state.exitCriteriaDone.has(id)) state.exitCriteriaDone.delete(id);
+      else state.exitCriteriaDone.add(id);
+      saveCurrentOpp();
+      renderStageSummary(stage);
+    });
   });
 
   // Show more / collapse for AI summary text
@@ -1011,9 +1057,10 @@ function ensureValidActiveOpp() {
     state.comments      = [];
     state.cover         = { opportunityOwner: state.currentEmail };
     state.attachments   = [];
-    state.stageNotes    = {};
-    state.stepRounds    = {};
-    state.activeStageId = '__cover__';
+    state.stageNotes       = {};
+    state.stepRounds       = {};
+    state.exitCriteriaDone = new Set();
+    state.activeStageId    = '__cover__';
     localStorage.setItem(SK.activeOpp, id);
     saveCurrentOpp();
   }
